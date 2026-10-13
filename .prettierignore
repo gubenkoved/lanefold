@@ -1,0 +1,8 @@
+dist/
+out/
+coverage/
+.vscode-test/
+test-results/
+playwright-report/
+package-lock.json
+dev/harness/themes/*.css

@@ -1,0 +1,61 @@
+.line {
+  font-family: var(--lf-mono);
+  font-variant-ligatures: none;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Wrapped, a command breaks only between its words: a word that does not fit moves to the next
+   line whole (never “--e|mpty”), and only one wider than the whole line breaks inside. */
+.wrap {
+  white-space: pre-wrap;
+}
+
+.wrap > .word {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.program {
+  color: var(--lf-syn-program);
+}
+
+.config {
+  color: var(--lf-fg-faint);
+}
+
+.subcommand {
+  color: var(--lf-syn-subcommand);
+  font-weight: 600;
+}
+
+.option {
+  color: var(--lf-syn-option);
+}
+
+.value {
+  color: var(--lf-syn-value);
+}
+
+.revision {
+  color: var(--lf-syn-revision);
+}
+
+.separator {
+  color: var(--lf-fg-faint);
+}
+
+.path {
+  color: var(--lf-syn-path);
+}
+
+.text {
+  color: var(--lf-fg);
+}
+
+.pending {
+  color: var(--lf-fg-faint);
+}

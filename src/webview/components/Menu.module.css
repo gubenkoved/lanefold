@@ -1,0 +1,200 @@
+.root {
+  display: contents;
+}
+
+.menu {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  max-width: 420px;
+  max-height: calc(100vh - 12px);
+  overflow: hidden;
+  border-radius: var(--lf-radius);
+  background: var(--vscode-menu-background, var(--lf-bg-overlay));
+  color: var(--vscode-menu-foreground, var(--lf-fg));
+  box-shadow: var(--lf-shadow-3);
+  border: 1px solid var(--vscode-menu-border, transparent);
+  font-size: var(--lf-text-md);
+  transform-origin: var(--lf-menu-origin, top left);
+  animation: menu-in var(--lf-dur-2) var(--lf-ease-out);
+}
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--lf-1);
+  outline: none;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: var(--lf-2);
+  width: 100%;
+  min-height: 26px;
+  padding: 2px var(--lf-2);
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+
+.item[data-active='true'] {
+  background: var(--vscode-menu-selectionBackground, var(--lf-selection));
+  color: var(--vscode-menu-selectionForeground, var(--lf-selection-fg));
+  /* High contrast themes mark the active item with a border instead. */
+  outline: 1px solid var(--vscode-menu-selectionBorder, transparent);
+  outline-offset: -1px;
+}
+
+/* Disabled items can be pointed at (the footer says why); they look it, active or not. */
+.item[aria-disabled='true'] {
+  cursor: default;
+}
+
+.item[aria-disabled='true'] > * {
+  opacity: 0.45;
+}
+
+.item[aria-disabled='true'][data-active='true'] {
+  background: var(--lf-hover);
+  color: inherit;
+  outline-style: dashed;
+}
+
+.item.danger:not([aria-disabled='true']) .label {
+  color: var(--lf-error);
+}
+
+.item[data-active='true'].danger .label {
+  color: inherit;
+}
+
+.icon {
+  display: inline-flex;
+  justify-content: center;
+  opacity: 0.85;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.labelText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.shortcut {
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg-muted);
+  padding-left: var(--lf-3);
+}
+
+.item[data-active='true'] .shortcut {
+  color: inherit;
+}
+
+.separator {
+  height: 1px;
+  margin: var(--lf-1) var(--lf-2);
+  background: var(--vscode-menu-separatorBackground, var(--lf-hairline));
+}
+
+.header {
+  padding: var(--lf-1) var(--lf-2) 2px;
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lf-fg-muted);
+}
+
+/* The menu's subject (a branch, a commit) keeps its own spelling: no capitals forced on it. */
+.title {
+  max-width: 100%;
+  padding: var(--lf-1) var(--lf-2) 3px;
+  overflow: hidden;
+  font-size: var(--lf-text-sm);
+  font-weight: 600;
+  color: var(--lf-fg-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footer {
+  flex: none;
+  /*
+   * The items set the menu's width, never the footer: it changes with the item pointed at, and
+   * a menu that grew and shrank under the pointer would jitter. Long hints are cut short (their
+   * tooltip has them whole), reasons and notes wrap.
+   */
+  width: 0;
+  min-width: 100%;
+  padding: 5px 10px;
+  border-top: 1px solid var(--vscode-menu-separatorBackground, var(--lf-hairline));
+  background: var(--vscode-menu-background, var(--lf-bg-overlay));
+  font-size: var(--lf-text-xs);
+  line-height: 1.4;
+  min-height: 24px;
+}
+
+.footerHint {
+  display: block;
+  font-family: var(--lf-mono);
+  color: var(--lf-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footerNote {
+  display: block;
+  color: var(--lf-fg-muted);
+}
+
+.prompt {
+  color: var(--lf-fg-faint);
+}
+
+.footerIdle {
+  color: var(--lf-fg-faint);
+}
+
+.reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--vscode-menu-foreground, var(--lf-fg));
+}
+
+.reasonIcon {
+  flex: none;
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--lf-fg-muted);
+}

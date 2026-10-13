@@ -1,0 +1,219 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--lf-hairline);
+  background: var(--lf-bg-subtle);
+}
+
+.message {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 8px;
+  border: 1px solid var(--lf-input-border);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-input-bg);
+  color: var(--lf-input-fg);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
+  resize: vertical;
+  outline: none;
+}
+
+.message::placeholder {
+  color: var(--lf-input-placeholder);
+}
+
+.message:focus {
+  border-color: var(--lf-focus);
+}
+
+/* In a short pane an empty message box takes one line until it is used: the lists keep the room. */
+@container worktree (max-height: 400px) {
+  .message:placeholder-shown:not(:focus) {
+    height: 30px;
+    min-height: 0;
+    resize: none;
+  }
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--lf-radius-sm);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.primary {
+  flex: 1 1 auto;
+  justify-content: center;
+  background: var(--lf-primary-bg);
+  color: var(--lf-primary-fg);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--lf-primary-hover);
+}
+
+.secondary {
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--lf-secondary-hover);
+}
+
+.primary:disabled,
+.secondary:disabled {
+  background: var(--lf-disabled-bg);
+  color: var(--lf-disabled-fg);
+  box-shadow: inset 0 0 0 1px var(--lf-hairline);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+/* Going on with a merge, pick, revert or rebase that git stopped. */
+.continue {
+  gap: 8px;
+}
+
+.opHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--lf-fg);
+  font-weight: 600;
+}
+
+.opHead :global(.codicon) {
+  color: var(--lf-warning);
+}
+
+.opTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opDetail,
+.prepared {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prepared {
+  padding: 4px 8px;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg-muted);
+  font-style: italic;
+}
+
+.reason {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.reason :global(.codicon) {
+  color: var(--lf-warning);
+}
+
+.detached {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.detached :global(.codicon) {
+  color: var(--lf-warning);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--lf-link);
+  font: inherit;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* Committing the parts of a commit being split. */
+.splitHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--lf-fg);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+}
+
+.splitHead :global(.codicon) {
+  color: var(--lf-warning);
+}
+
+.splitHead .opTitle {
+  flex: 1 1 auto;
+}
+
+.splitHead .link {
+  flex: 0 0 auto;
+  font-weight: normal;
+}

@@ -1,0 +1,326 @@
+.banner {
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-bottom: 1px solid var(--lf-hairline);
+  background: color-mix(in srgb, var(--lf-warning) 9%, var(--lf-bg));
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px 8px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  font-size: var(--lf-text-sm);
+  flex-wrap: wrap;
+}
+
+.icon {
+  color: var(--lf-warning);
+}
+
+/* The icon stays with the title; a long title wraps beside it. */
+.what {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.what > .icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+/* The buttons stay together: at the end of the line, or on a line of their own. */
+.actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.detail {
+  color: var(--lf-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50ch;
+}
+
+.count {
+  padding: 0 7px;
+  border-radius: var(--lf-radius-pill);
+  background: color-mix(in srgb, var(--lf-conflict) 22%, transparent);
+  color: var(--lf-conflict);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  line-height: 18px;
+}
+
+/* Why a step could not be carried out: git's account in plain words, wrapped. */
+.reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
+}
+
+.reason > :global(.codicon) {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--lf-success);
+  font-size: var(--lf-text-xs);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.primary,
+.secondary,
+.small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  white-space: nowrap;
+}
+
+.primary,
+.secondary {
+  height: 24px;
+  padding: 0 12px;
+  font-size: var(--lf-text-sm);
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.primary {
+  background: var(--lf-primary-bg);
+  color: var(--lf-primary-fg);
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--lf-primary-hover);
+}
+
+/* Clearly unavailable (waiting on conflicts), not just a paler blue on the tinted banner. */
+.primary:disabled,
+.secondary:disabled {
+  background: var(--lf-disabled-bg);
+  color: var(--lf-disabled-fg);
+  box-shadow: inset 0 0 0 1px var(--lf-hairline);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.secondary {
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--lf-secondary-hover);
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.file {
+  display: flex;
+  /* In a narrow panel the buttons go on under the file name rather than squeezing it out. */
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-height: 24px;
+  padding: 2px 4px;
+  border-radius: var(--lf-radius-sm);
+  font-size: var(--lf-text-sm);
+}
+
+.file:hover {
+  background: var(--lf-hover);
+}
+
+.conflictIcon {
+  color: var(--lf-conflict);
+  font-size: 13px;
+}
+
+.path {
+  min-width: 8ch;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--lf-link);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A conflict's actions, kept together at the end of its row (or on a line below it). */
+.actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-left: auto;
+}
+
+.path:disabled {
+  color: var(--lf-fg-muted);
+  cursor: default;
+}
+
+/* A submodule conflict's two commits (current ↔ incoming). */
+.commits {
+  flex: 0 0 auto;
+  color: var(--lf-fg-muted);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+}
+
+.path:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.small {
+  height: 20px;
+  padding: 0 7px;
+  background: transparent;
+  border: 1px solid var(--lf-hairline);
+  color: var(--lf-fg);
+  font-size: var(--lf-text-xs);
+}
+
+.small:hover {
+  background: var(--lf-hover);
+}
+
+.iconOnly {
+  padding: 0 3px;
+  border-color: transparent;
+  color: var(--lf-fg-muted);
+}
+
+.resolve {
+  border-color: color-mix(in srgb, var(--lf-success) 50%, transparent);
+  color: var(--lf-success);
+}
+
+/* Splitting a commit: what to do, and the parts so far. */
+.split {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 24px;
+}
+
+.note {
+  margin: 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  line-height: 1.45;
+}
+
+.show {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--lf-link);
+  font: inherit;
+  cursor: pointer;
+}
+
+.show:hover {
+  text-decoration: underline;
+}
+
+.show:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+.parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.part {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 36ch;
+  height: 20px;
+  padding: 0 7px 0 3px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-bg);
+  color: var(--lf-fg);
+  font: inherit;
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.part:hover {
+  background: var(--lf-hover);
+}
+
+.part:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+.partIndex {
+  min-width: 14px;
+  border-radius: var(--lf-radius-pill);
+  background: color-mix(in srgb, var(--lf-warning) 30%, transparent);
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
+
+.partSha {
+  color: var(--lf-fg-muted);
+  font-family: var(--lf-mono);
+}
+
+.partSubject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

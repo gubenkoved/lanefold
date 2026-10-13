@@ -1,0 +1,80 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lf-2);
+  height: 100%;
+  min-height: 160px;
+  padding: var(--lf-6);
+  text-align: center;
+  animation: empty-in var(--lf-dur-4) var(--lf-ease-out);
+}
+
+@keyframes empty-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.compact {
+  min-height: 120px;
+  padding: var(--lf-4);
+}
+
+.art {
+  width: 120px;
+  height: 64px;
+  margin-bottom: var(--lf-2);
+  color: var(--lf-fg-faint);
+}
+
+.icon {
+  font-size: 28px !important;
+  color: var(--lf-fg-faint);
+  margin-bottom: var(--lf-1);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--lf-text-lg);
+  font-weight: 600;
+  color: var(--lf-fg);
+}
+
+.description {
+  max-width: 440px;
+  margin: 0;
+  color: var(--lf-fg-muted);
+  line-height: 1.5;
+}
+
+.description code {
+  padding: 1px 4px;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg-muted);
+  font-family: var(--lf-mono);
+  font-size: 0.92em;
+}
+
+.detail {
+  max-width: 520px;
+  margin: 0;
+  padding: var(--lf-1) var(--lf-2);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg-muted);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-sm);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--lf-2);
+  margin-top: var(--lf-3);
+}

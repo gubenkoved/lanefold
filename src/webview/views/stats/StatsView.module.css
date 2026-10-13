@@ -1,0 +1,735 @@
+.root {
+  /*
+   * Chart colours. VS Code themes have none of their own, so these are a categorical palette
+   * checked for colour-blind separation and for contrast on dark and light panels (the light
+   * one's paler slots always come with their numbers in words, as the languages legend does).
+   * The first one is the single colour of one-series charts.
+   */
+  --stats-c1: #3987e5;
+  --stats-c2: #d95926;
+  --stats-c3: #199e70;
+  --stats-c4: #c98500;
+  --stats-c5: #d55181;
+  --stats-c6: #008300;
+  --stats-c7: #9085e9;
+  --stats-other: color-mix(in srgb, var(--lf-fg) 38%, var(--lf-bg));
+  --stats-series: var(--stats-c1);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+:global(body.vscode-light) .root,
+:global(body.vscode-high-contrast-light) .root {
+  --stats-c1: #2a78d6;
+  --stats-c2: #eb6834;
+  --stats-c3: #1baf7a;
+  --stats-c4: #eda100;
+  --stats-c5: #e87ba4;
+  --stats-c6: #008300;
+  --stats-c7: #4a3aa7;
+}
+
+/* ---- toolbar ------------------------------------------------------------------------------ */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--lf-hairline);
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 2px;
+  font-weight: 600;
+  color: var(--lf-fg-strong);
+  white-space: nowrap;
+}
+
+.titleIcon {
+  color: var(--lf-fg-muted);
+}
+
+.flex {
+  flex: 1 1 auto;
+}
+
+.segmented {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 2px;
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg-muted);
+}
+
+.segmented button {
+  height: 22px;
+  padding: 0 9px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+  transition:
+    background-color var(--lf-dur-2) var(--lf-ease-out),
+    color var(--lf-dur-2) var(--lf-ease-out);
+}
+
+.segmented button:hover {
+  color: var(--lf-fg);
+}
+
+.segmented button[aria-checked='true'] {
+  background: var(--lf-bg);
+  color: var(--lf-fg);
+  box-shadow:
+    var(--lf-shadow-1),
+    0 0 0 1px var(--lf-hairline);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 260px;
+  height: 24px;
+  padding: 0 2px 0 8px;
+  border: 1px solid color-mix(in srgb, var(--lf-accent) 45%, transparent);
+  border-radius: var(--lf-radius-pill);
+  background: color-mix(in srgb, var(--lf-accent) 16%, var(--lf-bg));
+  color: var(--lf-fg);
+  font-size: var(--lf-text-sm);
+}
+
+.root[data-animate] .chip {
+  animation: chip-in var(--lf-dur-2) var(--lf-ease-out);
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+.chip > :global(.codicon) {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: var(--lf-fg-muted);
+}
+
+.chipText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipClear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--lf-fg-muted);
+}
+
+.chipClear:hover {
+  background: var(--lf-hover);
+  color: var(--lf-fg);
+}
+
+.chipClear :global(.codicon) {
+  font-size: 13px;
+}
+
+.progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 16px;
+  min-height: 16px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- content ------------------------------------------------------------------------------ */
+
+.scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 1680px;
+  padding: 12px 16px 16px;
+  transition: opacity var(--lf-dur-3) var(--lf-ease-out);
+}
+
+/* Another selection is loading: the last one's numbers stay, dimmed. */
+.content[data-stale] {
+  opacity: 0.55;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
+}
+
+.notice :global(.codicon) {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.notice code {
+  font-family: var(--lf-mono);
+  color: var(--lf-fg);
+}
+
+.quiet {
+  margin: 0;
+  padding: 6px 2px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.footnote {
+  margin: 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.muted {
+  color: var(--lf-fg-muted);
+}
+
+.plus {
+  color: var(--lf-added-text);
+}
+
+.minus {
+  color: var(--lf-deleted-text);
+}
+
+/* ---- the author filtered to ------------------------------------------------------------- */
+
+.author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius-lg);
+  background: var(--lf-bg-subtle);
+}
+
+.root[data-animate] .author {
+  animation: rise var(--lf-dur-3) var(--lf-ease-out);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.authorText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.authorName {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--lf-text-lg);
+  font-weight: 600;
+  color: var(--lf-fg-strong);
+}
+
+.authorEmail {
+  margin-left: 6px;
+  font-size: var(--lf-text-xs);
+  font-weight: 400;
+  color: var(--lf-fg-muted);
+}
+
+.authorLine {
+  margin: 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.root[data-layout='narrow'] .author {
+  flex-wrap: wrap;
+}
+
+.root[data-layout='narrow'] .authorText {
+  flex-basis: calc(100% - 60px);
+}
+
+/* ---- summary tiles ------------------------------------------------------------------------ */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.root[data-layout='medium'] .tiles {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.root[data-layout='narrow'] .tiles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 8px 12px 9px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg-subtle);
+}
+
+.tile dt,
+.tile dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.tileLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.tileValue {
+  color: var(--lf-fg-strong);
+  font-size: var(--lf-text-xl);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tileDetail {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+/* ---- sections ----------------------------------------------------------------------------- */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 12px 12px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius-lg);
+  background: var(--lf-bg);
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 28px;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sectionNote {
+  min-width: 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+/* The lists, punch card and languages: two columns when wide, the lists across when not. */
+.sections {
+  display: grid;
+  grid-template-areas:
+    'contributors punch'
+    'hotspots languages';
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.sections[data-layout='medium'] {
+  grid-template-areas:
+    'contributors contributors'
+    'hotspots hotspots'
+    'punch languages';
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.sections[data-layout='narrow'] {
+  grid-template-areas: 'contributors' 'hotspots' 'punch' 'languages';
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.contributors {
+  grid-area: contributors;
+}
+
+.hotspots {
+  grid-area: hotspots;
+}
+
+.punchCard {
+  grid-area: punch;
+}
+
+.languages {
+  grid-area: languages;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: -4px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.key {
+  display: inline-block;
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.key + .key,
+.legendRow .key:not(:first-child) {
+  margin-left: 8px;
+}
+
+.key[data-kind='added'] {
+  background: var(--lf-added);
+}
+
+.key[data-kind='removed'] {
+  background: var(--lf-deleted);
+}
+
+/* ---- lists -------------------------------------------------------------------------------- */
+
+.listHead,
+.contributor,
+.hotspot {
+  display: grid;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.listHead,
+.contributor {
+  grid-template-columns:
+    22px minmax(120px, 1.4fr) minmax(120px, 1fr) minmax(88px, auto)
+    minmax(150px, auto) minmax(56px, auto);
+}
+
+.listHead[data-kind='hotspots'],
+.hotspot {
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 0.45fr) minmax(88px, auto) minmax(40px, auto);
+}
+
+.listHead {
+  padding: 0 8px 2px;
+  border-bottom: 1px solid var(--lf-hairline);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+/* The avatar column has no heading: the author's heading starts above it. */
+.listHead:not([data-kind]) > :first-child {
+  grid-column: 1 / 3;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  padding-top: 2px;
+  outline: none;
+}
+
+.contributor,
+.hotspot {
+  min-height: 30px;
+  padding: 3px 8px;
+  border-radius: var(--lf-radius-sm);
+  font-size: var(--lf-text-sm);
+  cursor: pointer;
+}
+
+.contributor:hover,
+.hotspot:hover {
+  background: var(--lf-hover);
+}
+
+.hotspot[data-static] {
+  cursor: default;
+}
+
+/* The author the view shows. */
+.contributor[data-filtered] {
+  background: color-mix(in srgb, var(--lf-accent) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--lf-accent);
+}
+
+.contributor[data-filtered] .name {
+  font-weight: 600;
+}
+
+/* The keyboard's row, while the list has focus. */
+.list:focus-visible [aria-selected='true'] {
+  background: var(--lf-selection);
+  color: var(--lf-selection-fg);
+  box-shadow: inset 0 0 0 1px var(--lf-focus);
+}
+
+.list:focus-visible [aria-selected='true'] :is(.email, .muted, .folder, .percent, .dates, .days) {
+  color: var(--lf-fg-muted-selected);
+}
+
+.who {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.share {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* A bar per row, the longest for the first: the lengths compare, the numbers say how much. */
+.meter {
+  flex: 1 1 auto;
+  min-width: 20px;
+  height: 6px;
+}
+
+.meter > span {
+  display: block;
+  min-width: 2px;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--stats-series);
+}
+
+.shareText {
+  flex: 0 0 auto;
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.percent {
+  flex: 0 0 auto;
+  width: 34px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.lineCell {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dates,
+.days {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+}
+
+.days {
+  text-align: right;
+}
+
+.authorsIcon {
+  font-size: 12px;
+  vertical-align: -2px;
+}
+
+.path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pathIcon {
+  flex: 0 0 auto;
+  color: var(--lf-fg-muted);
+}
+
+.pathText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder {
+  margin-left: 8px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.more {
+  align-self: flex-start;
+  margin: 4px 0 0 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.more:hover {
+  background: var(--lf-hover);
+  color: var(--lf-fg);
+}
+
+/* Narrower views: the dates and counts go on a second line, the column headings go. */
+.root:not([data-layout='wide']) .email {
+  display: none;
+}
+
+.root[data-layout='narrow'] .listHead {
+  display: none;
+}
+
+.root[data-layout='narrow'] .contributor {
+  grid-template-columns: 22px auto minmax(0, 1fr) minmax(96px, 0.8fr);
+  row-gap: 1px;
+}
+
+.root[data-layout='narrow'] .contributor > .who {
+  grid-column: 2 / 4;
+}
+
+.root[data-layout='narrow'] .contributor > .lineCell {
+  grid-row: 2;
+  grid-column: 2;
+  justify-self: start;
+  font-size: var(--lf-text-xs);
+}
+
+.root[data-layout='narrow'] .contributor > .days {
+  grid-row: 2;
+  grid-column: 3;
+  justify-self: start;
+}
+
+.root[data-layout='narrow'] .contributor > .dates {
+  grid-row: 2;
+  grid-column: 4;
+  justify-self: end;
+}
+
+.root[data-layout='narrow'] .hotspot {
+  grid-template-columns: minmax(0, 1fr) minmax(80px, 0.6fr);
+  row-gap: 1px;
+}
+
+.root[data-layout='narrow'] .hotspot > .lineCell {
+  grid-column: 1;
+  justify-self: start;
+  padding-left: 22px;
+  font-size: var(--lf-text-xs);
+}
+
+.root[data-layout='narrow'] .hotspot > .days {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.wideOnly {
+  white-space: nowrap;
+}
+
+.listHead > :nth-child(n + 3) {
+  text-align: right;
+}
+
+.listHead > :nth-child(4):not(:last-child) {
+  text-align: left;
+}

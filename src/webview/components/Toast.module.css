@@ -1,0 +1,125 @@
+/* Above the review sheet (its updates are told in toasts), below menus and pickers. */
+.host {
+  position: fixed;
+  left: 50%;
+  bottom: var(--lf-3);
+  z-index: 960;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--lf-2);
+  transform: translateX(-50%);
+  pointer-events: none;
+  width: min(520px, calc(100vw - 24px));
+  transition: bottom var(--lf-dur-3) var(--lf-ease-out);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-2);
+  max-width: 100%;
+  padding: 6px 6px 6px 10px;
+  border-radius: var(--lf-radius);
+  background: var(--vscode-notifications-background, var(--lf-bg-overlay));
+  color: var(--vscode-notifications-foreground, var(--lf-fg));
+  box-shadow: var(--lf-shadow-3);
+  border: 1px solid var(--vscode-notifications-border, transparent);
+  font-size: var(--lf-text-sm);
+  pointer-events: auto;
+}
+
+.icon {
+  flex: 0 0 auto;
+}
+
+.info .icon {
+  color: var(--lf-info);
+}
+
+.success .icon {
+  color: var(--lf-success);
+}
+
+.error .icon {
+  color: var(--lf-error);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Two lines at most in a narrow view; all of it in the tooltip. */
+.message {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* Up to three lines (what went wrong can take a sentence or two); all of it in the tooltip. */
+.detail {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.action {
+  flex: 0 0 auto;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-primary-bg);
+  color: var(--lf-primary-fg);
+  font-size: var(--lf-text-sm);
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.action:hover {
+  background: var(--lf-primary-hover);
+}
+
+.secondary {
+  flex: 0 0 auto;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+  font-size: var(--lf-text-sm);
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.secondary:hover {
+  background: var(--lf-secondary-hover);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+}
+
+.close:hover {
+  background: var(--lf-hover);
+  color: var(--lf-fg);
+}

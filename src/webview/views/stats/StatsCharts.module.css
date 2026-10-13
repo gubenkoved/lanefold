@@ -1,0 +1,329 @@
+/* ---- activity ----------------------------------------------------------------------------- */
+
+.activity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.plotRow {
+  display: flex;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.yAxis {
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 120px;
+  color: var(--lf-fg-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.yAxis > span {
+  position: absolute;
+  right: 0;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.plot {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 120px;
+}
+
+.grid,
+.baseline {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  pointer-events: none;
+}
+
+.grid {
+  background: var(--lf-hairline);
+}
+
+.baseline {
+  background: color-mix(in srgb, var(--lf-fg) 32%, transparent);
+}
+
+/* Periods before line counting stops show that they have no line counts. */
+.uncounted {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--lf-hairline);
+  background: var(--lf-bg-subtle);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  pointer-events: none;
+}
+
+.bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.slot {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+}
+
+.slot[aria-disabled='true'] {
+  cursor: default;
+}
+
+.slot:hover,
+.slot:focus-visible {
+  background: color-mix(in srgb, var(--lf-fg) 7%, transparent);
+}
+
+/* Bars at most 24px wide, 2px apart; rounded at the value end, square at the baseline. */
+.bar,
+.added,
+.removed {
+  position: absolute;
+  right: 0;
+  left: 0;
+  width: min(24px, calc(100% - 2px));
+  margin-inline: auto;
+}
+
+.bar {
+  bottom: 0;
+  border-radius: 3px 3px 0 0;
+  background: var(--stats-series);
+  transform-origin: bottom;
+}
+
+.added {
+  border-radius: 3px 3px 0 0;
+  background: var(--lf-added);
+  transform-origin: bottom;
+}
+
+.removed {
+  border-radius: 0 0 3px 3px;
+  background: var(--lf-deleted);
+  transform-origin: top;
+}
+
+.slot:hover > span,
+.slot:focus-visible > span {
+  filter: brightness(1.18) saturate(1.1);
+}
+
+.activity[data-animate] .bar,
+.activity[data-animate] .added,
+.activity[data-animate] .removed {
+  animation: grow var(--lf-dur-4) var(--lf-ease-out) both;
+  animation-delay: calc(var(--i) * 5ms);
+}
+
+@keyframes grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+.tooltip {
+  position: absolute;
+  top: 2px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 9px 6px;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg-overlay);
+  box-shadow: var(--lf-shadow-2);
+  color: var(--lf-fg);
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tooltip strong {
+  color: var(--lf-fg-strong);
+  font-size: var(--lf-text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tipPeriod {
+  color: var(--lf-fg-muted);
+}
+
+.xAxis {
+  position: relative;
+  height: 14px;
+  margin-left: 48px;
+  color: var(--lf-fg-muted);
+  font-size: 10px;
+}
+
+.xAxis > span {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+}
+
+/* ---- punch card --------------------------------------------------------------------------- */
+
+.punch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 640px;
+  margin: 0;
+}
+
+.punchGrid {
+  display: grid;
+  grid-template-columns: 30px repeat(24, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.hourLabel {
+  color: var(--lf-fg-muted);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.dayLabel {
+  align-self: center;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  line-height: 1;
+}
+
+.cell {
+  min-height: 8px;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--lf-bg-muted);
+}
+
+/* One hue, more commits darker on light themes and brighter on dark ones. */
+.cell[data-level='1'] {
+  background: color-mix(in srgb, var(--stats-series) 28%, var(--lf-bg));
+}
+
+.cell[data-level='2'] {
+  background: color-mix(in srgb, var(--stats-series) 52%, var(--lf-bg));
+}
+
+.cell[data-level='3'] {
+  background: color-mix(in srgb, var(--stats-series) 76%, var(--lf-bg));
+}
+
+.cell[data-level='4'] {
+  background: var(--stats-series);
+}
+
+:global(body.vscode-high-contrast) .cell[data-level='0'],
+:global(body.vscode-high-contrast-light) .cell[data-level='0'] {
+  box-shadow: inset 0 0 0 1px var(--lf-hairline);
+}
+
+.punchLegend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.punchLegend .cell {
+  width: 11px;
+  min-height: 0;
+}
+
+.punchLegend > span:first-child {
+  margin-right: 3px;
+}
+
+.punchLegend > span:last-child {
+  margin-left: 3px;
+}
+
+/* ---- languages ---------------------------------------------------------------------------- */
+
+.languages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.languageBar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+}
+
+.languageBar > span {
+  flex-basis: 0;
+  min-width: 3px;
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legend li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  font-size: var(--lf-text-sm);
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.languageName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.languageShare {
+  color: var(--lf-fg-strong);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.languageMeta {
+  grid-column: 2 / -1;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}

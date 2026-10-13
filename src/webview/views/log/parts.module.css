@@ -1,0 +1,271 @@
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--lf-fg);
+  user-select: none;
+}
+
+.sha {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg-subtle);
+  color: var(--lf-fg);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.sha:hover {
+  background: var(--lf-hover);
+}
+
+.sha :global(.codicon) {
+  font-size: 12px;
+  color: var(--lf-fg-muted);
+}
+
+.commitChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-bg-subtle);
+  color: var(--lf-fg);
+  font-size: var(--lf-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.commitChip:disabled {
+  cursor: default;
+}
+
+.commitChip:not(:disabled):hover {
+  background: var(--lf-hover);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.chipSha {
+  flex: 0 0 auto;
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg-muted);
+}
+
+.chipSubject {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.refs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 6px 0 4px;
+  border-radius: 9px;
+  border: 1px solid var(--lf-hairline);
+  background: var(--lf-bg-muted);
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+}
+
+/* A very long name ends in an ellipsis (the full name is the tooltip). */
+.refText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ref :global(.codicon) {
+  font-size: 12px;
+  color: var(--lf-fg-muted);
+}
+
+.refHead {
+  border-color: var(--lf-accent);
+}
+
+.refTag {
+  background: transparent;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sectionHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  container: section-header / inline-size;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px 8px 2px 12px;
+  background: var(--lf-bg);
+  border-bottom: 1px solid var(--lf-hairline);
+}
+
+.sectionTitle {
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--lf-fg-muted);
+  white-space: nowrap;
+}
+
+.count {
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--lf-badge-bg);
+  color: var(--lf-badge-fg);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats {
+  display: inline-flex;
+  gap: 6px;
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.plus {
+  color: var(--lf-added-text);
+}
+
+.minus {
+  color: var(--lf-deleted-text);
+}
+
+.flex {
+  flex: 1 1 auto;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--lf-button-border);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--lf-secondary-hover);
+}
+
+.action:disabled {
+  opacity: 0.5;
+}
+
+.action :global(.codicon) {
+  font-size: 14px;
+}
+
+/* Secondary header actions shrink to their icon when the pane is narrow (the tooltip keeps the name). */
+@container section-header (max-width: 460px) {
+  .collapsible {
+    padding: 0 4px;
+  }
+
+  .collapsible > span {
+    display: none;
+  }
+}
+
+.primary {
+  background: var(--lf-primary-bg);
+  color: var(--lf-primary-fg);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--lf-primary-hover);
+}
+
+.primary:disabled {
+  background: var(--lf-disabled-bg);
+  color: var(--lf-disabled-fg);
+  box-shadow: inset 0 0 0 1px var(--lf-hairline);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 12px;
+  padding: 6px 8px;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
+}
+
+.notice :global(.codicon) {
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
+.loading,
+.error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.error {
+  color: var(--lf-error);
+}

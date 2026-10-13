@@ -1,0 +1,118 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/*
+ * The app never scrolls as a whole: something reaching past the window's edge (a hit area, a
+ * shadow) would otherwise let focus or scrollIntoView shift the whole UI by a few pixels.
+ */
+#root {
+  overflow: clip;
+}
+
+body {
+  background: var(--lf-bg);
+  color: var(--lf-fg);
+  font-family: var(--lf-font);
+  font-size: var(--lf-text-md);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+  cursor: default;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: -1px;
+}
+
+::selection {
+  background: var(--vscode-editor-selectionBackground, rgba(38, 79, 120, 0.8));
+}
+
+/* High contrast themes select with an opaque colour and say which text colour goes on it. */
+body.vscode-high-contrast ::selection,
+body.vscode-high-contrast-light ::selection {
+  color: var(--vscode-editor-selectionForeground);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7));
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--vscode-scrollbarSlider-activeBackground, rgba(191, 191, 191, 0.4));
+}
+
+.mono {
+  font-family: var(--lf-mono);
+  font-variant-ligatures: none;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.selectable {
+  user-select: text;
+  cursor: text;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='off']) {
+    --lf-dur-1: 0ms;
+    --lf-dur-2: 80ms;
+    --lf-dur-3: 120ms;
+    --lf-dur-4: 160ms;
+  }
+}

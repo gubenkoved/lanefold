@@ -1,0 +1,10 @@
+node_modules/
+dist/
+out/
+coverage/
+.vscode-test/
+test-results/
+playwright-report/
+*.vsix
+*.tsbuildinfo
+.DS_Store

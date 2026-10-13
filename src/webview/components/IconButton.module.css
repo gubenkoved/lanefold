@@ -1,0 +1,40 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  transition:
+    background-color var(--lf-dur-1) var(--lf-ease-out),
+    color var(--lf-dur-1) var(--lf-ease-out),
+    transform var(--lf-dur-2) var(--lf-ease-spring);
+}
+
+.button:hover {
+  background: var(--vscode-toolbar-hoverBackground, var(--lf-hover));
+  color: var(--lf-fg);
+}
+
+.button:active {
+  transform: scale(0.92);
+}
+
+.button[aria-pressed='true'] {
+  background: var(--vscode-inputOption-activeBackground, var(--lf-bg-muted));
+  color: var(--vscode-inputOption-activeForeground, var(--lf-fg));
+}
+
+.button:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.small {
+  width: 20px;
+  height: 20px;
+}

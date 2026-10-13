@@ -1,0 +1,543 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: max(16px, 6vh) 16px 16px;
+  background: color-mix(in srgb, var(--lf-bg) 45%, transparent);
+  backdrop-filter: blur(1.5px);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 100%);
+  max-height: 100%;
+  border-radius: var(--lf-radius-lg);
+  background: var(--vscode-editorWidget-background, var(--lf-bg-overlay));
+  color: var(--lf-fg);
+  border: 1px solid var(--vscode-editorWidget-border, var(--lf-hairline));
+  box-shadow: var(--lf-shadow-3);
+  overflow: hidden;
+}
+
+/* Focused only to keep keyboard focus in the sheet until its controls are ready. */
+.dialog:focus {
+  outline: none;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--lf-hairline);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--lf-text-lg);
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: var(--lf-radius-pill);
+  background: color-mix(in srgb, var(--lf-error) 18%, transparent);
+  color: var(--lf-error);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.spinner {
+  margin-left: auto;
+  color: var(--lf-fg-muted);
+}
+
+.summary {
+  margin: 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
+}
+
+/* What it would do, while it cannot: dimmed, but still readable. */
+.summary[data-dimmed] {
+  opacity: 0.85;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+  overflow-y: auto;
+  transition: opacity var(--lf-dur-2) var(--lf-ease-out);
+}
+
+.body[data-busy='true'] {
+  opacity: 0.75;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* A fieldset (disabled as a whole when nothing in it can make the plan possible). */
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.fields:disabled {
+  opacity: 0.55;
+}
+
+.fields:empty {
+  display: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fieldLabel {
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lf-fg-muted);
+}
+
+.input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--lf-input-border, var(--lf-hairline));
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-input-bg);
+  color: var(--lf-input-fg);
+  font-family: inherit;
+  font-size: var(--lf-text-md);
+  outline: none;
+  resize: vertical;
+}
+
+.input:focus {
+  border-color: var(--lf-focus);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--vscode-inputValidation-errorBorder, var(--lf-error));
+}
+
+/* Why a field's value will not do, right under it (a hint while the form is untouched). */
+.fieldError {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  color: var(--lf-error);
+  font-size: var(--lf-text-xs);
+  line-height: 1.4;
+}
+
+.fieldError :global(.codicon) {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  font-size: 12px;
+}
+
+.fieldError[data-soft] {
+  color: var(--lf-fg-muted);
+}
+
+.hint {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  line-height: 1.4;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--lf-text-sm);
+  cursor: pointer;
+}
+
+.checkbox input {
+  accent-color: var(--lf-accent);
+}
+
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 2px;
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg-muted);
+}
+
+.segmented button {
+  height: 24px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  transition:
+    background-color var(--lf-dur-2) var(--lf-ease-out),
+    color var(--lf-dur-2) var(--lf-ease-out);
+}
+
+.segmented button[aria-checked='true'] {
+  background: var(--lf-bg);
+  color: var(--lf-fg);
+  box-shadow:
+    var(--lf-shadow-1),
+    0 0 0 1px var(--lf-hairline);
+}
+
+.segmented button:hover:not(:disabled) {
+  color: var(--lf-fg);
+}
+
+.segmented button:disabled {
+  cursor: not-allowed;
+}
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notice {
+  --c: var(--lf-info);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--lf-radius);
+  border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+  background: color-mix(in srgb, var(--c) 9%, transparent);
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
+}
+
+.notice :global(.codicon) {
+  margin-top: 1px;
+  color: var(--c);
+  flex: 0 0 auto;
+}
+
+.notice[data-level='warning'] {
+  --c: var(--lf-warning);
+}
+
+.notice[data-level='danger'] {
+  --c: var(--lf-error);
+}
+
+/* The way on when a plan is blocked for want of something (a remote). */
+.remedy {
+  display: flex;
+  margin-top: -6px;
+}
+
+.remedy button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+  font-size: var(--lf-text-sm);
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.remedy button:hover {
+  background: var(--lf-secondary-hover);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: opacity var(--lf-dur-2) var(--lf-ease-out);
+}
+
+/* What would run, while it cannot: dimmed, but its text still reads at 4.5:1. */
+.section[data-dimmed] {
+  opacity: 0.8;
+}
+
+/* Read out by screen readers, not shown. */
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--lf-fg-muted);
+}
+
+.changes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--lf-text-sm);
+}
+
+.changes li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.changes code {
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  padding: 1px 5px;
+  border-radius: var(--lf-radius-xs);
+  background: var(--lf-bg-muted);
+}
+
+.refName {
+  font-weight: 600;
+}
+
+.arrow {
+  color: var(--lf-fg-muted);
+  font-size: 12px;
+}
+
+.created {
+  color: var(--lf-added-text);
+  font-size: var(--lf-text-xs);
+}
+
+.deleted {
+  color: var(--lf-deleted-text);
+  font-size: var(--lf-text-xs);
+}
+
+.conflicts {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--lf-warning);
+  font-size: var(--lf-text-sm);
+}
+
+.conflicts code {
+  margin: 0 3px;
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg);
+}
+
+.copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.copy:hover {
+  background: var(--lf-hover);
+  color: var(--lf-fg);
+}
+
+.commands {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.command {
+  padding: 8px 10px;
+  border-radius: var(--lf-radius);
+  background: var(--vscode-textCodeBlock-background, var(--lf-bg-muted));
+}
+
+.commandLine {
+  display: flex;
+  gap: 8px;
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-sm);
+}
+
+.prompt {
+  color: var(--lf-fg-faint);
+  user-select: none;
+}
+
+.explanation {
+  margin: 6px 0 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  line-height: 1.4;
+}
+
+.flags {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0 0;
+}
+
+.flag {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) 1fr;
+  gap: 10px;
+  font-size: var(--lf-text-xs);
+  line-height: 1.4;
+}
+
+.flag dt code {
+  font-family: var(--lf-mono);
+  color: var(--lf-syn-option);
+}
+
+.flag dd {
+  margin: 0;
+  color: var(--lf-fg-muted);
+}
+
+.error {
+  margin: 0;
+  color: var(--lf-error);
+  font-size: var(--lf-text-sm);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--lf-hairline);
+}
+
+.keys {
+  flex: 1 1 auto;
+  color: var(--lf-fg-faint);
+  font-size: var(--lf-text-xs);
+}
+
+.keys kbd {
+  font-family: var(--lf-mono);
+  font-size: 10px;
+  padding: 0 4px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: 3px;
+}
+
+/* A run asked for, held back: the fresh plan puts more at risk than the one on screen did. */
+.held {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--lf-warning);
+  font-size: var(--lf-text-xs);
+}
+
+.cancel,
+.run {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  font-size: var(--lf-text-md);
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.cancel {
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.cancel:hover {
+  background: var(--lf-secondary-hover);
+}
+
+.run {
+  min-width: 84px;
+  justify-content: center;
+  background: var(--lf-primary-bg);
+  color: var(--lf-primary-fg);
+}
+
+.run:hover:not(:disabled) {
+  background: var(--lf-primary-hover);
+}
+
+.run:disabled {
+  background: var(--lf-disabled-bg);
+  color: var(--lf-disabled-fg);
+  box-shadow: inset 0 0 0 1px var(--lf-hairline);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.run.danger {
+  background: var(--vscode-statusBarItem-errorBackground, #c72e0f);
+  color: var(--vscode-statusBarItem-errorForeground, #fff);
+}
+
+.run.danger:hover:not(:disabled) {
+  filter: brightness(1.1);
+}

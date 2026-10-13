@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly run of the performance budgets (they build a 100k-commit repository).
+    - cron: '17 3 * * 1'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && fromJSON('["self-hosted", "ubuntu-vm"]') || matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run lint
+      - name: Format
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run format:check
+      - run: npm run typecheck
+      - name: Unit and git tests
+        run: npx vitest run
+      - run: npm run build
+
+  e2e:
+    name: UI e2e (harness)
+    runs-on: [self-hosted, ubuntu-vm]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  vscode:
+    name: VS Code integration (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && fromJSON('["self-hosted", "ubuntu-vm"]') || matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Integration tests (Linux, virtual display)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:vscode
+      - name: Integration tests
+        if: runner.os != 'Linux'
+        run: npm run test:vscode
+
+  perf:
+    name: Performance budgets
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: [self-hosted, ubuntu-vm]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:perf
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 30
+
+  package:
+    name: Package VSIX
+    runs-on: [self-hosted, ubuntu-vm]
+    needs: [check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lanefold-vsix
+          path: '*.vsix'
+          retention-days: 14

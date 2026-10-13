@@ -1,0 +1,18 @@
+# An allowlist: nothing ships unless it is listed here (what the extension runs and shows).
+**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!media/logo/lanefold-256.png
+!media/lanefold.svg
+!dist/extension.js
+!dist/logWorker.js
+!dist/*.LEGAL.txt
+!dist/scripts/*.js
+!dist/scripts/askpass.sh
+!dist/webview/main.js
+!dist/webview/main.css
+!dist/webview/chunks/*.js
+!dist/webview/assets/*.ttf
+!dist/webview/THIRD_PARTY_LICENSES.md

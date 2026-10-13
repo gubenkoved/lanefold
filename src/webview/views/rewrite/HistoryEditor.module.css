@@ -1,0 +1,1571 @@
+/* The history editor covers its log tab (the graph stays mounted underneath). */
+.root {
+  --lf-act-pick: var(--lf-fg-muted);
+  --lf-act-reword: var(--vscode-charts-blue, #3794ff);
+  --lf-act-edit: var(--vscode-charts-yellow, #cca700);
+  --lf-act-squash: var(--vscode-charts-purple, #b180d7);
+  --lf-act-fixup: var(--vscode-charts-purple, #b180d7);
+  --lf-act-drop: var(--vscode-charts-red, #f14c4c);
+  /* Orange from the theme's red and yellow: its charts.orange can be translucent. */
+  --lf-act-split: color-mix(
+    in srgb,
+    var(--vscode-charts-red, #f14c4c) 50%,
+    var(--vscode-charts-yellow, #cca700)
+  );
+  --col-author: 132px;
+  --col-date: 104px;
+  --col-sha: 76px;
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--lf-bg);
+  container-type: inline-size;
+}
+
+/* Focusable only so that a click inside keeps the keys in the editor: no ring for that. */
+.root:focus {
+  outline: none;
+}
+
+[data-action='pick'] {
+  --act: var(--lf-act-pick);
+}
+[data-action='reword'] {
+  --act: var(--lf-act-reword);
+}
+[data-action='edit'] {
+  --act: var(--lf-act-edit);
+}
+[data-action='squash'] {
+  --act: var(--lf-act-squash);
+}
+[data-action='fixup'] {
+  --act: var(--lf-act-fixup);
+}
+[data-action='drop'] {
+  --act: var(--lf-act-drop);
+}
+[data-action='split'] {
+  --act: var(--lf-act-split);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+/* ---- header ------------------------------------------------------------------------------- */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-2);
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 var(--lf-2) 0 var(--lf-3);
+  border-bottom: 1px solid var(--lf-hairline);
+  min-width: 0;
+}
+
+.titleIcon {
+  color: var(--lf-accent);
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--lf-text-md);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  /* In a narrow header it gives way, its name ending in “…” rather than being cut. */
+  min-width: 0;
+  height: 20px;
+  padding: 0 7px 0 5px;
+  border-radius: var(--lf-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+  font-weight: 600;
+}
+
+.branch :global(.codicon) {
+  font-size: 13px;
+  color: var(--c);
+}
+
+.branchName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lf-2);
+  margin-left: var(--lf-1);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+}
+
+.counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.counts strong {
+  color: var(--lf-fg);
+}
+
+.counts :global(.codicon) {
+  font-size: 12px;
+}
+
+.predict {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-bg-muted);
+  color: inherit;
+  font: inherit;
+  font-size: var(--lf-text-xs);
+}
+
+/* A state about one commit selects it. */
+button.predict {
+  cursor: pointer;
+}
+
+button.predict:hover {
+  box-shadow: inset 0 0 0 1px var(--lf-border);
+}
+
+button.predict:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+/* The text in the foreground colour (status colours are too light for text on light themes),
+   the icon and the tint in the status colour. */
+.predict[data-state='clean'] {
+  color: var(--lf-fg);
+  background: color-mix(in srgb, var(--lf-success) 12%, transparent);
+}
+
+.predict[data-state='conflict'] {
+  color: var(--lf-fg);
+  background: color-mix(in srgb, var(--lf-conflict) 13%, transparent);
+}
+
+.predict[data-state='blocked'] {
+  color: var(--lf-fg);
+  background: color-mix(in srgb, var(--lf-error) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lf-error) 45%, transparent);
+}
+
+.predict :global(.codicon) {
+  font-size: 12px;
+}
+
+.predict[data-state='clean'] :global(.codicon) {
+  color: var(--lf-success);
+}
+
+.predict[data-state='conflict'] :global(.codicon) {
+  color: var(--lf-conflict);
+}
+
+.predict[data-state='blocked'] :global(.codicon) {
+  color: var(--lf-error);
+}
+
+/* A refused Apply: why lights up where it is said (the header's state, the notice below). */
+[data-nudge] {
+  animation: nudge 900ms var(--lf-ease-out);
+}
+
+@keyframes nudge {
+  0%,
+  100% {
+    outline: 2px solid transparent;
+  }
+  15%,
+  60% {
+    outline: 2px solid color-mix(in srgb, var(--lf-error) 80%, transparent);
+    outline-offset: 2px;
+  }
+}
+
+/* Read out by screen readers only. */
+.announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.headerTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg);
+  cursor: pointer;
+}
+
+.tool:hover:not(:disabled) {
+  background: var(--lf-hover);
+}
+
+.tool[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--lf-accent) 22%, transparent);
+  color: var(--lf-fg-strong);
+}
+
+.tool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tool:focus-visible,
+.cancel:focus-visible,
+.apply:focus-visible,
+.actionButton:focus-visible,
+.chip:focus-visible,
+.textButton:focus-visible,
+.editMessage:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+.cancel,
+.apply {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--lf-radius-sm);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.cancel {
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.cancel:hover {
+  background: var(--lf-secondary-hover);
+}
+
+.apply {
+  background: var(--lf-primary-bg);
+  color: var(--lf-primary-fg);
+  font-weight: 600;
+}
+
+.apply:hover:not(:disabled) {
+  background: var(--lf-primary-hover);
+}
+
+.apply:disabled {
+  background: var(--lf-disabled-bg);
+  color: var(--lf-disabled-fg);
+  box-shadow: inset 0 0 0 1px var(--lf-hairline);
+  opacity: 1;
+  cursor: not-allowed;
+}
+
+.applyWarning:not(:disabled) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lf-warning) 70%, transparent);
+}
+
+/* ---- action bar --------------------------------------------------------------------------- */
+
+.actionBar {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-1);
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 var(--lf-2);
+  border-bottom: 1px solid var(--lf-hairline);
+  background: var(--lf-bg-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.actionButton {
+  --act: var(--lf-fg-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--lf-dur-1) var(--lf-ease-out),
+    border-color var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.actionButton :global(.codicon) {
+  color: var(--act);
+  font-size: 14px;
+}
+
+.actionButton kbd {
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg-muted);
+  font-family: var(--lf-mono);
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+
+.actionButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--act) 14%, transparent);
+}
+
+.actionButton[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--act) 55%, transparent);
+  background: color-mix(in srgb, var(--act) 18%, transparent);
+}
+
+.actionButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 var(--lf-1);
+  background: var(--lf-hairline);
+  flex: 0 0 auto;
+}
+
+.textButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-link);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.textButton:hover:not(:disabled) {
+  background: var(--lf-hover);
+}
+
+.textButton:disabled {
+  color: var(--lf-fg-faint);
+  cursor: default;
+}
+
+.selectionCount {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+  padding-right: var(--lf-1);
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-2);
+  padding: 0 var(--lf-3);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--lf-warning) 12%, var(--lf-bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--lf-warning) 40%, transparent);
+  font-size: var(--lf-text-sm);
+  min-height: 34px;
+}
+
+.confirm > :global(.codicon) {
+  color: var(--lf-warning);
+}
+
+.confirm > span {
+  flex: 1 1 auto;
+}
+
+.confirmDanger,
+.confirmKeep {
+  white-space: nowrap;
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--lf-radius-sm);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.confirmDanger {
+  background: var(--lf-act-drop);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+}
+
+.confirmKeep {
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+}
+
+/* ---- plan list ---------------------------------------------------------------------------- */
+
+.main {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Its own width (narrower than the editor's beside the result pane) decides the list's columns. */
+.planPane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  container: plan / inline-size;
+}
+
+.columns,
+.row {
+  display: grid;
+  grid-template-columns:
+    18px 40px 86px minmax(0, 1fr) var(--col-author) var(--col-date) var(--col-sha)
+    24px;
+  align-items: center;
+}
+
+.columns {
+  height: 24px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--lf-hairline);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.columns > span {
+  padding: 0 var(--lf-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.list {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  outline: none;
+  overscroll-behavior: contain;
+}
+
+.rows {
+  position: relative;
+  outline: none;
+}
+
+.row {
+  position: relative;
+  height: 32px;
+  background: var(--lf-bg);
+  color: var(--lf-fg);
+  cursor: default;
+  user-select: none;
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--lf-hover) 100%, var(--lf-bg));
+}
+
+.row[data-group-focus] {
+  background: color-mix(in srgb, var(--lf-accent) 6%, var(--lf-bg));
+}
+
+.row[data-selected] {
+  background: var(--lf-selection-inactive);
+}
+
+.rows:focus-within .row[data-selected] {
+  background: var(--lf-selection);
+  color: var(--lf-selection-fg);
+}
+
+.rows:focus .row[data-focused]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--lf-focus);
+  pointer-events: none;
+}
+
+.handle {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--lf-fg-faint);
+  cursor: grab;
+  opacity: 0;
+  touch-action: none;
+  transition: opacity var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.row:hover .handle,
+.row[data-selected] .handle {
+  opacity: 1;
+}
+
+.handle:active {
+  cursor: grabbing;
+}
+
+/* ---- dragging ------------------------------------------------------------------------------ */
+
+.list[data-dragging],
+.list[data-dragging] .row,
+.list[data-dragging] .handle {
+  cursor: grabbing;
+}
+
+.row[data-dragged] {
+  opacity: 0.4;
+}
+
+/* Dropping here folds the dragged commits into this one. */
+.row[data-drop-target] {
+  background: color-mix(in srgb, var(--lf-focus) 14%, var(--lf-bg));
+}
+
+.row[data-drop-target]::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border: 1px dashed var(--lf-focus);
+  border-radius: var(--lf-radius-sm);
+  pointer-events: none;
+}
+
+/* Dropping here moves them between two rows: an accent line across, from the lane (where a
+   ring marks the new place) to a dot at the end; a rim of background keeps it off row edges. */
+.insertion {
+  position: absolute;
+  left: 31px;
+  right: 10px;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: var(--lf-focus);
+  box-shadow: 0 0 0 1px var(--lf-bg);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.insertion::before,
+.insertion::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.insertion::before {
+  left: -4px;
+  border: 2px solid var(--lf-focus);
+  background: var(--lf-bg);
+}
+
+.insertion::after {
+  right: -4px;
+  background: var(--lf-focus);
+}
+
+.dragLabel {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* Never wider than the window (it is kept inside it). */
+  max-width: min(420px, calc(100vw - 16px));
+  box-sizing: border-box;
+  padding: 4px 9px;
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg-elevated);
+  box-shadow: var(--lf-shadow-2);
+  color: var(--lf-fg);
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.dragLabel > span:first-of-type {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dragLabel :global(.codicon) {
+  flex: 0 0 auto;
+  color: var(--lf-fg-muted);
+}
+
+/* Outside the editor (it follows the pointer above everything): its own colour for squash. */
+.dragLabel[data-kind='fold'] :global(.codicon) {
+  color: var(--vscode-charts-purple, #b180d7);
+}
+
+.dragHint {
+  flex: 0 0 auto;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+/* Under the list: how to arrange with the mouse, and the keys that do the same. */
+.listHint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: var(--lf-2) 0 var(--lf-3);
+  /* Its words under the base row's. */
+  padding: 0 var(--lf-3) 0 57px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  line-height: 1.6;
+}
+
+.listHint > :global(.codicon) {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.listHint kbd {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg);
+  font-family: var(--lf-mono);
+  font-size: 10px;
+}
+
+.graph {
+  display: block;
+  overflow: visible;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  justify-self: start;
+  height: 20px;
+  margin-left: 2px;
+  padding: 0 4px 0 6px;
+  border: 1px solid color-mix(in srgb, var(--act) 55%, transparent);
+  border-radius: var(--lf-radius-pill);
+  background: color-mix(in srgb, var(--act) 15%, transparent);
+  color: var(--lf-fg);
+  font: inherit;
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--lf-dur-1) var(--lf-ease-out),
+    transform var(--lf-dur-2) var(--lf-ease-spring);
+}
+
+.chip :global(.codicon) {
+  font-size: 12px;
+  color: var(--act);
+}
+
+.chip:hover {
+  background: color-mix(in srgb, var(--act) 28%, transparent);
+}
+
+.chip[data-action='pick'] {
+  background: transparent;
+  border-color: var(--lf-hairline);
+  color: var(--lf-fg-muted);
+  font-weight: 500;
+}
+
+.chip[data-action='fixup'] {
+  background: transparent;
+  border-style: dashed;
+}
+
+.chip .chipCaret {
+  font-size: 10px;
+  color: var(--lf-fg-faint);
+}
+
+.message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 var(--lf-2);
+}
+
+.subject {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.reworded {
+  margin-right: 4px;
+  color: var(--lf-act-reword);
+  font-size: 12px;
+  vertical-align: -2px;
+}
+
+.row[data-role='member'] .subject {
+  color: var(--lf-fg-muted);
+}
+
+.row[data-role='drop'] .subject,
+.row[data-role='drop'] .author,
+.row[data-role='drop'] .date,
+.row[data-role='drop'] .sha {
+  color: var(--lf-fg-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--lf-act-drop) 70%, transparent);
+}
+
+.pills {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pill,
+.pillMore {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 17px;
+  padding: 0 6px 0 4px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  background: color-mix(in srgb, var(--c) 15%, transparent);
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.pill :global(.codicon) {
+  font-size: 11px;
+  color: var(--c);
+}
+
+.pillTag {
+  border-color: var(--lf-hairline);
+  background: var(--lf-bg-muted);
+}
+
+.pillRemote {
+  border-style: dashed;
+  background: transparent;
+  color: var(--lf-fg-muted);
+}
+
+.pillTag :global(.codicon) {
+  color: var(--lf-fg-muted);
+}
+
+.pillMore {
+  --c: var(--lf-fg-muted);
+  padding: 0 5px;
+  background: transparent;
+}
+
+.author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 var(--lf-2);
+  color: var(--lf-fg-muted);
+}
+
+.authorName,
+.date,
+.sha {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.date,
+.sha {
+  padding: 0 var(--lf-2);
+  color: var(--lf-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sha {
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+}
+
+/* On a selected row the secondary texts take the row's own colour: muted, they would be too
+   faint against the selection (WCAG AA asks for 4.5:1). */
+.row[data-selected] .author,
+.row[data-selected] .date,
+.row[data-selected] .sha,
+.row[data-selected] .pillRemote,
+.row[data-selected] .chip[data-action='pick'],
+.row[data-selected][data-role='member'] .subject,
+.row[data-selected][data-role='drop'] .subject {
+  color: inherit;
+}
+
+.step {
+  display: grid;
+  place-items: center;
+  width: 20px;
+}
+
+.step[data-status='conflict'] {
+  color: var(--lf-conflict);
+}
+
+.step[data-status='empty'] {
+  color: var(--lf-info);
+}
+
+.step[data-status='unknown'] {
+  color: var(--lf-fg-faint);
+}
+
+.step[data-status='problem'] {
+  color: var(--lf-error);
+}
+
+/* The commit the arrangement cannot be applied because of. */
+.row[data-problem]:not([data-selected]) {
+  background: color-mix(in srgb, var(--lf-error) 9%, var(--lf-bg));
+}
+
+.base {
+  display: grid;
+  grid-template-columns: 18px 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--lf-2);
+  height: 32px;
+  padding-right: var(--lf-2);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.base > :first-child {
+  grid-column: 2;
+}
+
+.baseText {
+  min-width: 0;
+  padding-left: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.baseSubject {
+  color: var(--lf-fg);
+}
+
+.unchanged {
+  color: var(--lf-fg-muted);
+}
+
+.baseText code {
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+}
+
+/* ---- result ------------------------------------------------------------------------------- */
+
+.resultPane {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: clamp(260px, 32%, 400px);
+  min-height: 0;
+  border-left: 1px solid var(--lf-hairline);
+  background: var(--lf-bg-subtle);
+}
+
+.paneTabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 0 var(--lf-2);
+  border-bottom: 1px solid var(--lf-hairline);
+}
+
+.paneTab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--lf-2);
+  border: 0;
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font: inherit;
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.paneTab:hover {
+  color: var(--lf-fg);
+}
+
+.paneTab[aria-selected='true'] {
+  color: var(--lf-fg-strong);
+}
+
+.paneTab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: var(--lf-2);
+  right: var(--lf-2);
+  bottom: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--lf-accent);
+}
+
+.paneTab:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: -2px;
+}
+
+.badge {
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-badge-bg);
+  color: var(--lf-badge-fg);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  letter-spacing: 0;
+}
+
+.results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--lf-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card {
+  padding: 7px 10px 8px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg);
+  cursor: default;
+  transition:
+    border-color var(--lf-dur-2) var(--lf-ease-out),
+    box-shadow var(--lf-dur-2) var(--lf-ease-out);
+}
+
+.card[data-focused] {
+  border-color: color-mix(in srgb, var(--lf-accent) 70%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--lf-accent) 35%, transparent),
+    var(--lf-shadow-1);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.cardDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.cardSubject {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.cardConflict {
+  color: var(--lf-conflict);
+}
+
+.cardProblem {
+  flex: 0 0 auto;
+  color: var(--lf-error);
+}
+
+.card[data-problem] {
+  border-color: color-mix(in srgb, var(--lf-error) 60%, transparent);
+}
+
+.cardBranch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 18px;
+  padding: 0 6px 0 4px;
+  border-radius: var(--lf-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardBranch :global(.codicon) {
+  font-size: 12px;
+  color: var(--c);
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+  padding-left: 16px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.cardNote {
+  margin: 6px 0 0 16px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  line-height: 1.45;
+}
+
+.dot {
+  /* Text too: as readable as the details around it. */
+  color: var(--lf-fg-muted);
+}
+
+.tag,
+.tagWarn,
+.tagSplit {
+  padding: 0 6px;
+  border-radius: var(--lf-radius-pill);
+  background: color-mix(in srgb, var(--lf-act-squash) 16%, transparent);
+  color: var(--lf-fg);
+  line-height: 16px;
+}
+
+.tagWarn {
+  background: color-mix(in srgb, var(--lf-act-edit) 18%, transparent);
+}
+
+.tagSplit {
+  background: color-mix(in srgb, var(--lf-act-split) 18%, transparent);
+}
+
+.cardBody {
+  margin: 6px 0 0 16px;
+  padding: 0;
+  max-height: 140px;
+  overflow: auto;
+  color: var(--lf-fg-muted);
+  font-family: var(--lf-font);
+  font-size: var(--lf-text-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editMessage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0 0 12px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-link);
+  font: inherit;
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.editMessage:hover {
+  background: var(--lf-hover);
+}
+
+.editor {
+  margin-top: 8px;
+}
+
+.textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 72px;
+  padding: 6px 8px;
+  border: 1px solid var(--lf-input-border);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-input-bg);
+  color: var(--lf-input-fg);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
+  resize: vertical;
+  outline: none;
+}
+
+.textarea:focus {
+  border-color: var(--lf-focus);
+}
+
+.editorActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.empty {
+  padding: var(--lf-4);
+  color: var(--lf-fg-muted);
+  text-align: center;
+}
+
+/* ---- footer and commands ---------------------------------------------------------------- */
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+  max-height: 30%;
+  overflow-y: auto;
+  padding: 6px var(--lf-3);
+  border-top: 1px solid var(--lf-hairline);
+  font-size: var(--lf-text-sm);
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--lf-fg);
+  line-height: 1.45;
+}
+
+.notice > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.notice > :global(.codicon) {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--lf-info);
+}
+
+/* The commit a notice is about (selects it), in front of its text. */
+.noticeSha {
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lf-link);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.noticeSha:hover {
+  text-decoration: underline;
+}
+
+/* A way out, right after what is wrong. */
+.fix {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  margin: 0 0 0 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-secondary-bg);
+  box-shadow: inset 0 0 0 1px var(--lf-button-border);
+  color: var(--lf-secondary-fg);
+  font: inherit;
+  font-size: var(--lf-text-xs);
+  vertical-align: 1px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fix:hover {
+  background: var(--lf-secondary-hover);
+}
+
+.noticeSha:focus-visible,
+.fix:focus-visible,
+.moreNotes:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+/* Folds the notes away in a narrow editor (shown there only). */
+.moreNotes {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  height: 20px;
+  padding: 0 4px 0 0;
+  border: 0;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-link);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  cursor: pointer;
+}
+
+.moreNotes > :global(.codicon:first-child) {
+  color: var(--lf-info);
+}
+
+.moreNotes:hover {
+  text-decoration: underline;
+}
+
+.notice[data-level='warning'] > :global(.codicon) {
+  color: var(--lf-warning);
+}
+
+.notice[data-level='danger'] > :global(.codicon) {
+  color: var(--lf-error);
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.checkbox code {
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  color: var(--lf-syn-option);
+}
+
+.git {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--lf-2) var(--lf-3) var(--lf-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-3);
+}
+
+.gitHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lf-2);
+}
+
+.gitHint {
+  flex: 1 1 auto;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  line-height: 1.45;
+}
+
+.gitHint code {
+  font-family: var(--lf-mono);
+  color: var(--lf-syn-option);
+}
+
+.commands {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-3);
+}
+
+.commandLine {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+}
+
+.prompt {
+  color: var(--lf-fg-faint);
+  user-select: none;
+}
+
+.explanation {
+  margin: 4px 0 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.flags {
+  margin: 4px 0 0;
+  display: grid;
+  gap: 2px;
+  font-size: var(--lf-text-xs);
+}
+
+.flags > div {
+  display: grid;
+  grid-template-columns: minmax(110px, max-content) 1fr;
+  gap: var(--lf-2);
+}
+
+.flags dt code {
+  color: var(--lf-syn-option);
+  font-family: var(--lf-mono);
+}
+
+.flags dd {
+  margin: 0;
+  color: var(--lf-fg-muted);
+}
+
+.todo pre {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  line-height: 1.55;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.todoTitle {
+  margin-bottom: 4px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ---- narrow panels ------------------------------------------------------------------------ */
+
+@container plan (max-width: 760px) {
+  .columns,
+  .row {
+    --col-sha: 0px;
+  }
+  .columns .colSha,
+  .row .sha {
+    visibility: hidden;
+  }
+}
+
+@container plan (max-width: 620px) {
+  .columns,
+  .row {
+    --col-author: 0px;
+  }
+  .columns .colAuthor,
+  .row .author {
+    visibility: hidden;
+  }
+}
+
+@container plan (max-width: 430px) {
+  .columns,
+  .row {
+    --col-date: 0px;
+  }
+  .columns .colDate,
+  .row .date {
+    visibility: hidden;
+  }
+}
+
+@container (max-width: 760px) {
+  .titleText {
+    display: none;
+  }
+}
+
+/* Room for the branch, the state, Undo and Redo: "3 → 2" (its words in a tooltip). */
+@container (max-width: 640px) {
+  /* (Over the codicon font's own display.) */
+  .header > .titleIcon:global(.codicon),
+  .countsWord {
+    display: none;
+  }
+}
+
+@container (max-width: 700px) {
+  /* Undo and Redo stay; the commands are a tab of the pane below too. */
+  .headerTools .gitTool {
+    display: none;
+  }
+  .main {
+    flex-direction: column;
+  }
+  .resultPane {
+    width: auto;
+    max-height: 38%;
+    border-left: 0;
+    border-top: 1px solid var(--lf-hairline);
+  }
+  .actionButton span {
+    display: none;
+  }
+  /* The notes fold behind one line (the list and the result keep the room); what cannot be
+     applied and the warnings show in full. */
+  .footer:not([data-expanded]) [data-foldable] {
+    display: none;
+  }
+  .moreNotes {
+    display: inline-flex;
+  }
+}
+
+@container (max-width: 480px) {
+  /* The state as an icon (its words in the tooltip, and for screen readers). */
+  .predict {
+    padding: 0 5px;
+  }
+  .predictText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .cancel,
+  .apply {
+    padding: 0 9px;
+  }
+  /* Icon-only actions (named for screen readers), no selection count. */
+  .actionButton kbd,
+  .selectionCount,
+  .actionBar .divider {
+    display: none;
+  }
+  .actionButton {
+    padding: 0 5px;
+  }
+}
+
+/* The narrowest panels: the branch keeps its name (the Result tab counts the commits). */
+@container (max-width: 360px) {
+  .counts {
+    display: none;
+  }
+}

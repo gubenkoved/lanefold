@@ -1,0 +1,8 @@
+{
+  "files.watcherExclude": {
+    "**/out/**": true,
+    "**/.vscode-test/**": true,
+    "**/test-results/**": true,
+    "**/playwright-report/**": true
+  }
+}

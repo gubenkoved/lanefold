@@ -1,0 +1,199 @@
+/*
+ * Lanefold design tokens. Every color derives from VS Code's theme variables, so the UI is native
+ * in any theme (including high contrast). Components use only --lf-* tokens, never raw colors.
+ */
+:root {
+  /* Surfaces */
+  --lf-bg: var(--vscode-panel-background, var(--vscode-editor-background, #1f1f1f));
+  --lf-bg-elevated: var(--vscode-editorWidget-background, var(--lf-bg));
+  --lf-bg-overlay: var(--vscode-quickInput-background, var(--lf-bg-elevated));
+  --lf-bg-subtle: color-mix(in srgb, var(--lf-fg) 3.5%, var(--lf-bg));
+  --lf-bg-muted: color-mix(in srgb, var(--lf-fg) 7%, var(--lf-bg));
+  --lf-hover: var(--vscode-list-hoverBackground, color-mix(in srgb, var(--lf-fg) 8%, transparent));
+  --lf-selection: var(--vscode-list-activeSelectionBackground, #04395e);
+  --lf-selection-fg: var(--vscode-list-activeSelectionForeground, var(--lf-fg));
+  --lf-selection-inactive: var(--vscode-list-inactiveSelectionBackground, var(--lf-bg-muted));
+
+  /* Text */
+  --lf-fg: var(--vscode-foreground, #cccccc);
+  --lf-fg-strong: var(--vscode-editor-foreground, var(--lf-fg));
+  --lf-fg-muted: var(--vscode-descriptionForeground, color-mix(in srgb, var(--lf-fg) 65%, transparent));
+  /*
+   * Faint text (hints, timestamps): a step below muted where the theme leaves room for it and
+   * still reads at 4.5:1 (dark themes); light and high contrast themes leave none (see below).
+   */
+  --lf-fg-faint: color-mix(in srgb, var(--lf-fg-muted) 86%, var(--lf-bg));
+  /* Secondary text on a selected row, whose background is darker (or lighter) than the panel's. */
+  --lf-fg-muted-selected: color-mix(in srgb, var(--lf-fg) 55%, var(--lf-fg-muted));
+  --lf-link: var(--vscode-textLink-foreground, #4daafc);
+
+  /* Lines */
+  --lf-border: var(
+    --vscode-panel-border,
+    var(--vscode-widget-border, color-mix(in srgb, var(--lf-fg) 16%, transparent))
+  );
+  --lf-hairline: color-mix(in srgb, var(--lf-fg) 9%, transparent);
+  --lf-focus: var(--vscode-focusBorder, #0078d4);
+
+  /* Accents */
+  --lf-accent: var(--vscode-focusBorder, #0078d4);
+  --lf-primary-bg: var(--vscode-button-background, #0078d4);
+  --lf-primary-fg: var(--vscode-button-foreground, #ffffff);
+  --lf-primary-hover: var(--vscode-button-hoverBackground, #026ec1);
+  --lf-secondary-bg: var(--vscode-button-secondaryBackground, #313131);
+  --lf-secondary-fg: var(--vscode-button-secondaryForeground, #cccccc);
+  --lf-secondary-hover: var(--vscode-button-secondaryHoverBackground, #3c3c3c);
+  /* Buttons' edge: subtle in the modern themes, the contrast colour in high contrast. */
+  --lf-button-border: var(--vscode-button-border, transparent);
+  /* Unavailable buttons: plainly grey, not a paler version of their color. */
+  --lf-disabled-bg: var(--lf-bg-muted);
+  --lf-disabled-fg: var(--vscode-disabledForeground, var(--lf-fg-faint));
+  --lf-badge-bg: var(--vscode-badge-background, #616161);
+  --lf-badge-fg: var(--vscode-badge-foreground, #f8f8f8);
+  --lf-input-bg: var(--vscode-input-background, #313131);
+  --lf-input-fg: var(--vscode-input-foreground, #cccccc);
+  --lf-input-border: var(--vscode-input-border, transparent);
+  --lf-input-placeholder: var(--vscode-input-placeholderForeground, #989898);
+
+  /* Semantic (git) */
+  --lf-added: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
+  --lf-modified: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+  --lf-deleted: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39);
+  --lf-renamed: var(--vscode-gitDecoration-renamedResourceForeground, #73c991);
+  --lf-untracked: var(--vscode-gitDecoration-untrackedResourceForeground, #73c991);
+  --lf-conflict: var(--vscode-gitDecoration-conflictingResourceForeground, #e4676b);
+  --lf-error: var(--vscode-errorForeground, #f48771);
+  --lf-warning: var(--vscode-editorWarning-foreground, #cca700);
+  --lf-success: var(--vscode-testing-iconPassed, #73c991);
+  --lf-info: var(--vscode-editorInfo-foreground, #3794ff);
+  /*
+   * The git colours above suit bars, icons and borders; text (counts, labels) mixes in some of
+   * the foreground so it stays readable on every surface, selected rows included.
+   */
+  --lf-added-text: color-mix(in srgb, var(--lf-added) 72%, var(--lf-fg));
+  --lf-deleted-text: color-mix(in srgb, var(--lf-deleted) 72%, var(--lf-fg));
+
+  /*
+   * Syntax for command lines: the theme's token colors (so they match the editor), with a little
+   * of the foreground mixed in so small text keeps its contrast.
+   */
+  --lf-syn-program: var(--lf-fg-muted);
+  --lf-syn-subcommand: color-mix(
+    in srgb,
+    var(--vscode-symbolIcon-functionForeground, #b180d7) 85%,
+    var(--lf-fg)
+  );
+  --lf-syn-option: color-mix(in srgb, var(--vscode-debugTokenExpression-name, #c586c0) 85%, var(--lf-fg));
+  --lf-syn-value: color-mix(in srgb, var(--vscode-debugTokenExpression-string, #ce9178) 85%, var(--lf-fg));
+  --lf-syn-revision: color-mix(
+    in srgb,
+    var(--vscode-symbolIcon-variableForeground, #75beff) 85%,
+    var(--lf-fg)
+  );
+  --lf-syn-path: color-mix(in srgb, var(--vscode-debugTokenExpression-number, #b5cea8) 85%, var(--lf-fg));
+
+  /* Elevation */
+  --lf-shadow-color: var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  --lf-shadow-1: 0 1px 2px var(--lf-shadow-color);
+  --lf-shadow-2: 0 0 0 1px var(--lf-hairline), 0 6px 18px -4px var(--lf-shadow-color);
+  --lf-shadow-3: 0 0 0 1px var(--lf-hairline), 0 18px 48px -8px var(--lf-shadow-color);
+
+  /* Type */
+  --lf-font: var(--vscode-font-family, system-ui, -apple-system, 'Segoe UI', Ubuntu, sans-serif);
+  --lf-mono: var(
+    --vscode-editor-font-family,
+    ui-monospace,
+    'SF Mono',
+    'Cascadia Code',
+    Menlo,
+    Consolas,
+    monospace
+  );
+  --lf-text-xs: 11px;
+  --lf-text-sm: 12px;
+  --lf-text-md: var(--vscode-font-size, 13px);
+  --lf-text-lg: 15px;
+  --lf-text-xl: 19px;
+
+  /* Space and shape (4px grid) */
+  --lf-1: 4px;
+  --lf-2: 8px;
+  --lf-3: 12px;
+  --lf-4: 16px;
+  --lf-5: 20px;
+  --lf-6: 24px;
+  --lf-8: 32px;
+  --lf-radius-xs: 3px;
+  --lf-radius-sm: 4px;
+  --lf-radius: 6px;
+  --lf-radius-lg: 10px;
+  --lf-radius-pill: 999px;
+
+  /* Motion */
+  --lf-dur-1: 90ms;
+  --lf-dur-2: 160ms;
+  --lf-dur-3: 240ms;
+  --lf-dur-4: 360ms;
+  --lf-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --lf-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* A gentle spring (~3% overshoot) expressed with CSS linear() easing. */
+  --lf-ease-spring: linear(
+    0,
+    0.013 0.6%,
+    0.05 1.2%,
+    0.2 2.7%,
+    0.398 4.3%,
+    0.597 6.1%,
+    0.759 8%,
+    0.881 10%,
+    0.962 12.2%,
+    1.011 14.6%,
+    1.033 17.3%,
+    1.035 20.6%,
+    1.024 25.1%,
+    1.008 31.5%,
+    0.999 41.2%,
+    1
+  );
+}
+
+:root[data-motion='reduced'] {
+  --lf-dur-1: 0ms;
+  --lf-dur-2: 80ms;
+  --lf-dur-3: 120ms;
+  --lf-dur-4: 160ms;
+  --lf-ease-spring: var(--lf-ease-out);
+}
+
+:root[data-motion='off'] {
+  --lf-dur-1: 0ms;
+  --lf-dur-2: 0ms;
+  --lf-dur-3: 0ms;
+  --lf-dur-4: 0ms;
+}
+
+/*
+ * Light themes' description color is about as light as small text can be: faint text uses it too.
+ * Their error red, success green and warning amber are too light for small text on white (3.1 to
+ * 4.4:1): some foreground mixed in makes them read at 4.5:1.
+ */
+body.vscode-light {
+  --lf-fg-faint: var(--lf-fg-muted);
+  --lf-error: color-mix(in srgb, var(--vscode-errorForeground, #e51400) 70%, var(--lf-fg));
+  --lf-success: color-mix(in srgb, var(--vscode-testing-iconPassed, #388a34) 75%, var(--lf-fg));
+  --lf-warning: color-mix(in srgb, var(--vscode-editorWarning-foreground, #bf8803) 60%, var(--lf-fg));
+}
+
+/* High contrast: no translucency, crisp contrast borders everywhere. */
+body.vscode-high-contrast,
+body.vscode-high-contrast-light {
+  --lf-fg-faint: var(--lf-fg-muted);
+  --lf-hairline: var(--vscode-contrastBorder, #6fc3df);
+  --lf-border: var(--vscode-contrastBorder, #6fc3df);
+  --lf-bg-subtle: var(--lf-bg);
+  --lf-bg-muted: var(--lf-bg);
+  --lf-shadow-2: 0 0 0 1px var(--vscode-contrastBorder, #6fc3df);
+  --lf-shadow-3: 0 0 0 1px var(--vscode-contrastBorder, #6fc3df);
+  --lf-secondary-bg: var(--vscode-button-secondaryBackground, transparent);
+  --lf-secondary-hover: var(--vscode-button-secondaryHoverBackground, transparent);
+}

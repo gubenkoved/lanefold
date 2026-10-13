@@ -1,0 +1,87 @@
+.card {
+  position: fixed;
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  max-width: min(460px, calc(100vw - 16px));
+  padding: 10px 12px;
+  border-radius: var(--lf-radius);
+  background: var(--vscode-editorHoverWidget-background, var(--lf-bg-overlay));
+  color: var(--vscode-editorHoverWidget-foreground, var(--lf-fg));
+  border: 1px solid var(--vscode-editorHoverWidget-border, transparent);
+  box-shadow: var(--lf-shadow-3);
+  font-size: var(--lf-text-sm);
+  pointer-events: none;
+  animation: card-in var(--lf-dur-2) var(--lf-ease-out);
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+
+.subject {
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.repository {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.repositoryDot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+}
+
+.body {
+  margin: 0;
+  font-family: var(--lf-font);
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--lf-fg-muted);
+}
+
+.meta,
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.author {
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.sha {
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg-muted);
+}
+
+.plus {
+  color: var(--lf-added-text);
+}
+
+.minus {
+  color: var(--lf-deleted-text);
+}

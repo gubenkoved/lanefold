@@ -1,0 +1,60 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.main {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.connecting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lf-2);
+  height: 100%;
+  color: var(--lf-fg-muted);
+  animation: fade-in var(--lf-dur-4) var(--lf-ease-out) 300ms both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.view[hidden] {
+  display: none;
+}
+
+.emptyAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.emptyAction:hover {
+  background: var(--lf-secondary-hover);
+}

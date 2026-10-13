@@ -1,0 +1,21 @@
+.retry {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--lf-button-border);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.retry:hover {
+  background: var(--lf-secondary-hover);
+}
+
+.retry:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}

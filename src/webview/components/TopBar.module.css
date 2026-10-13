@@ -1,0 +1,252 @@
+.bar {
+  display: flex;
+  align-items: stretch;
+  gap: var(--lf-2);
+  height: 35px;
+  padding: 0 var(--lf-2) 0 var(--lf-2);
+  border-bottom: 1px solid var(--lf-hairline);
+  background: var(--lf-bg);
+  flex: 0 0 auto;
+}
+
+.repo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  max-width: 280px;
+  height: 24px;
+  padding: 0 8px 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg);
+  white-space: nowrap;
+  transition:
+    background-color var(--lf-dur-1) var(--lf-ease-out),
+    border-color var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.repo:hover {
+  border-color: var(--lf-hairline);
+  background: var(--lf-hover);
+}
+
+.repoName {
+  font-weight: 600;
+  font-size: var(--lf-text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--lf-text-sm);
+  color: var(--lf-fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.branch :global(.codicon) {
+  font-size: 13px;
+}
+
+.chevron {
+  font-size: 12px;
+  color: var(--lf-fg-muted);
+}
+
+.divider {
+  width: 1px;
+  margin: 9px 2px;
+  background: var(--lf-hairline);
+  flex: 0 0 auto;
+}
+
+.tabs {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  padding-top: 5px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.sync {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  margin-right: var(--lf-2);
+  padding: 0 2px;
+  height: 24px;
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg-muted);
+}
+
+.syncButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  min-width: 24px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg);
+  font: inherit;
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.syncButton:hover:not(:disabled) {
+  background: var(--lf-hover);
+}
+
+.syncButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.syncButton:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: -1px;
+}
+
+.syncButton :global(.codicon) {
+  font-size: 14px;
+}
+
+.count {
+  min-width: 14px;
+  padding: 0 4px;
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-badge-bg);
+  color: var(--lf-badge-fg);
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* In place of the sync controls while there is no remote. */
+.addRemote {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  margin-right: var(--lf-2);
+  padding: 0 8px 0 6px;
+  border: 1px dashed var(--lf-hairline);
+  border-radius: var(--lf-radius-pill);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font: inherit;
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.addRemote:hover:not(:disabled) {
+  border-style: solid;
+  background: var(--lf-hover);
+  color: var(--lf-fg);
+}
+
+.addRemote:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.addRemote:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+.addRemote :global(.codicon) {
+  font-size: 14px;
+}
+
+.stash {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  margin-right: var(--lf-2);
+  padding: 0 8px 0 6px;
+  border: 1px dashed var(--lf-hairline);
+  border-radius: var(--lf-radius-pill);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font: inherit;
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stash:hover {
+  border-style: solid;
+  background: var(--lf-hover);
+  color: var(--lf-fg);
+}
+
+.stash:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+.stash :global(.codicon) {
+  font-size: 14px;
+}
+
+/*
+ * Narrow panels (a side bar): the tabs get a row of their own under the repository and actions.
+ * The width classes are set on <html> by the app (container queries would make the app a
+ * containing block for its fixed-position menus).
+ */
+:global(html[data-lt560]) .bar {
+  flex-wrap: wrap;
+  height: auto;
+  row-gap: 0;
+  padding-top: 3px;
+}
+
+:global(html[data-lt560]) .divider {
+  display: none;
+}
+
+:global(html[data-lt560]) .tabs {
+  order: 3;
+  flex-basis: 100%;
+  padding-top: 2px;
+}
+
+:global(html[data-lt560]) .actions {
+  margin-left: auto;
+}
+
+:global(html[data-lt560]) .repo {
+  max-width: 55%;
+}
+
+:global(html[data-lt340]) .branch {
+  display: none;
+}
+
+/* Narrow: the icon says it (with its label for screen readers and as a tooltip). */
+:global(html[data-lt560]) .addRemoteLabel {
+  display: none;
+}
+
+:global(html[data-lt560]) .addRemote {
+  padding: 0 5px;
+}

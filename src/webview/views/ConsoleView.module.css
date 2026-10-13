@@ -1,0 +1,344 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-2);
+  height: 34px;
+  padding: 0 var(--lf-3);
+  border-bottom: 1px solid var(--lf-hairline);
+  flex: 0 0 auto;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg-muted);
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 10px;
+  white-space: nowrap;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  transition:
+    background-color var(--lf-dur-2) var(--lf-ease-out),
+    color var(--lf-dur-2) var(--lf-ease-out),
+    box-shadow var(--lf-dur-2) var(--lf-ease-out);
+}
+
+.segment[aria-pressed='true'] {
+  background: var(--lf-bg);
+  color: var(--lf-fg);
+  box-shadow:
+    var(--lf-shadow-1),
+    0 0 0 1px var(--lf-hairline);
+}
+
+.count {
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--lf-fg-muted);
+}
+
+.search {
+  display: flex;
+  flex: 0 1 240px;
+  align-items: center;
+  gap: 6px;
+  min-width: 90px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--lf-input-border);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-input-bg);
+  color: var(--lf-fg-muted);
+}
+
+.search:focus-within {
+  border-color: var(--lf-focus);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--lf-input-fg);
+  font-size: var(--lf-text-sm);
+}
+
+.search input::placeholder {
+  color: var(--lf-input-placeholder);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--lf-1) 0 var(--lf-3);
+  user-select: text;
+  overscroll-behavior: contain;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 22px 64px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  column-gap: var(--lf-2);
+  min-height: 24px;
+  padding: 0 var(--lf-3);
+  cursor: pointer;
+  animation: row-in var(--lf-dur-3) var(--lf-ease-out);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.row:hover {
+  background: var(--lf-hover);
+}
+
+.row[data-expanded='true'] {
+  background: var(--lf-bg-subtle);
+}
+
+/* Chatty background queries recede: one muted colour, no syntax colours (contrast stays AA). */
+.row[data-background='true'] .command,
+.row[data-background='true'] .label,
+.row[data-background='true'] .command span {
+  color: var(--lf-fg-muted);
+  font-weight: normal;
+}
+
+/* High contrast themes never trade contrast for hierarchy. */
+:global(body.vscode-high-contrast) .row .command,
+:global(body.vscode-high-contrast) .row .label {
+  opacity: 1;
+}
+
+.status {
+  display: inline-flex;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.ok {
+  color: var(--lf-success);
+}
+
+.okQuiet {
+  color: var(--lf-fg-faint);
+}
+
+.error {
+  color: var(--lf-error);
+}
+
+.running {
+  color: var(--lf-info);
+}
+
+.cancelled {
+  color: var(--lf-fg-faint);
+}
+
+.time {
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.command {
+  min-width: 0;
+  font-size: var(--lf-text-sm);
+}
+
+/* How many times a query ran within moments ("×5"). */
+.repeat {
+  padding: 0 6px;
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-badge-bg);
+  color: var(--lf-badge-fg);
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+.label {
+  max-width: 220px;
+  padding: 1px 7px;
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duration {
+  min-width: 52px;
+  text-align: right;
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.slow {
+  color: var(--lf-warning);
+}
+
+.details {
+  margin: 0 var(--lf-3) var(--lf-2) calc(22px + 64px + var(--lf-3) + 2 * var(--lf-2));
+  padding: var(--lf-2) var(--lf-3);
+  border-left: 2px solid var(--lf-hairline);
+  font-size: var(--lf-text-sm);
+  animation: details-in var(--lf-dur-2) var(--lf-ease-out);
+}
+
+@keyframes details-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+.detailsError {
+  border-left-color: var(--lf-error);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lf-1) var(--lf-4);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  margin-bottom: var(--lf-2);
+}
+
+.runs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--lf-2);
+  margin-bottom: var(--lf-2);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.run {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.output {
+  margin: 0 0 var(--lf-2);
+  padding: var(--lf-2);
+  max-height: 260px;
+  overflow: auto;
+  border-radius: var(--lf-radius-sm);
+  background: var(--vscode-textCodeBlock-background, var(--lf-bg-muted));
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.stderr {
+  color: var(--lf-error);
+}
+
+.actions {
+  display: flex;
+  gap: var(--lf-2);
+}
+
+.textButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg);
+  font-size: var(--lf-text-xs);
+}
+
+.textButton:hover {
+  background: var(--lf-hover);
+}
+
+/* Narrow panels keep the command readable: shorter descriptions, then no start times. */
+:global(html[data-lt560]) .label {
+  max-width: 120px;
+}
+
+:global(html[data-lt440]) .row {
+  grid-template-columns: 22px minmax(0, 1fr) auto auto auto;
+}
+
+:global(html[data-lt440]) .time {
+  display: none;
+}
+
+:global(html[data-lt440]) .details {
+  margin-left: calc(22px + var(--lf-3) + var(--lf-2));
+}
+
+.jump {
+  position: absolute;
+  right: var(--lf-4);
+  bottom: var(--lf-4);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-primary-bg);
+  color: var(--lf-primary-fg);
+  box-shadow: var(--lf-shadow-2);
+  font-size: var(--lf-text-sm);
+  animation: jump-in var(--lf-dur-3) var(--lf-ease-spring);
+}
+
+@keyframes jump-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+
+.listWrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

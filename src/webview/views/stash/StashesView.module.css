@@ -1,0 +1,252 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 4px 8px 4px 12px;
+  border-bottom: 1px solid var(--lf-hairline);
+}
+
+.toolbarIcon {
+  color: var(--lf-fg-muted);
+}
+
+.toolbarTitle {
+  font-weight: 600;
+  color: var(--lf-fg-strong);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.list {
+  flex: 1 1 auto;
+  min-width: 220px;
+  overflow-y: auto;
+  padding: 4px 0;
+  outline: none;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 6px;
+  padding: 7px 8px;
+  border-radius: var(--lf-radius);
+  cursor: default;
+  transition: background-color var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.row:hover {
+  background: var(--lf-hover);
+}
+
+.row[aria-selected='true'] {
+  background: var(--lf-selection-inactive);
+}
+
+.list:focus .row[aria-selected='true'] {
+  background: var(--lf-selection);
+  color: var(--lf-selection-fg);
+}
+
+.list:focus-visible .row[aria-selected='true'] {
+  box-shadow: inset 0 0 0 1px var(--lf-focus);
+}
+
+.rowIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--lf-accent) 16%, transparent);
+  color: var(--lf-accent);
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rowTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.rowSubtitle {
+  margin-left: 8px;
+  color: var(--lf-fg-muted);
+  font-weight: 400;
+}
+
+.list:focus .row[aria-selected='true'] .rowSubtitle,
+.list:focus .row[aria-selected='true'] .rowMeta {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.rowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.rowMeta code {
+  font-family: var(--lf-mono);
+}
+
+.branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.branch :global(.codicon) {
+  font-size: 12px;
+}
+
+.badge,
+.staged {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg-muted);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.staged {
+  margin-left: 4px;
+  background: color-mix(in srgb, var(--lf-added) 18%, transparent);
+  color: var(--lf-added-text);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--lf-hairline);
+  background: var(--lf-bg);
+}
+
+.body[data-stacked='true'] {
+  flex-direction: column;
+}
+
+.body[data-stacked='true'] .list {
+  min-width: 0;
+  min-height: 80px;
+}
+
+.body[data-stacked='true'] .side {
+  border-left: 0;
+  border-top: 1px solid var(--lf-hairline);
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  animation: pane-in var(--lf-dur-2) var(--lf-ease-out);
+}
+
+@keyframes pane-in {
+  from {
+    opacity: 0.4;
+  }
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--lf-hairline);
+}
+
+.subject {
+  margin: 0;
+  font-size: var(--lf-text-lg);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--lf-fg-strong);
+  overflow-wrap: anywhere;
+}
+
+.when {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  line-height: 1.5;
+}
+
+.when code {
+  font-family: var(--lf-mono);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--lf-link);
+  font-family: var(--lf-mono);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.files {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}

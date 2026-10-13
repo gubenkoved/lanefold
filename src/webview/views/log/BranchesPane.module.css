@@ -1,0 +1,335 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  background: var(--lf-bg);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin: 6px 6px 4px;
+  padding: 0 6px;
+  height: 24px;
+  border: 1px solid var(--lf-input-border);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-input-bg);
+}
+
+.search:focus-within {
+  border-color: var(--lf-focus);
+}
+
+.searchIcon {
+  flex: 0 0 auto;
+  color: var(--lf-fg-muted);
+  font-size: 13px;
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--lf-input-fg);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--lf-input-placeholder);
+}
+
+.tree {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 8px;
+  outline: none;
+}
+
+.section,
+.folder,
+.row,
+.more {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding-right: 6px;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}
+
+.section {
+  margin-top: 6px;
+  padding-left: 4px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.section:first-child {
+  margin-top: 0;
+}
+
+.folder {
+  color: var(--lf-fg-muted);
+}
+
+.section:hover,
+.folder:hover,
+.row:hover {
+  background: var(--lf-hover);
+}
+
+.tree:focus .section[data-focused='true'],
+.tree:focus .folder[data-focused='true'],
+.tree:focus .row[data-focused='true'] {
+  box-shadow: inset 0 0 0 1px var(--lf-focus);
+}
+
+.row[aria-selected='true'] {
+  background: var(--lf-selection-inactive);
+}
+
+.row[data-current='true'] .name {
+  font-weight: 600;
+  color: var(--lf-fg-strong);
+}
+
+.row[data-hidden='true'] .name,
+.row[data-hidden='true'] .refIcon {
+  opacity: 0.45;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--lf-fg-muted) 60%, transparent);
+}
+
+.chevron {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.folderIcon,
+.refIcon {
+  flex: 0 0 auto;
+  font-size: 14px;
+  color: var(--lf-fg-muted);
+}
+
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.count {
+  flex: 0 0 auto;
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--lf-badge-bg);
+  color: var(--lf-badge-fg);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 15px;
+  letter-spacing: normal;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.folder .count {
+  background: transparent;
+  color: var(--lf-fg-muted);
+}
+
+.ahead,
+.behind {
+  flex: 0 0 auto;
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ahead {
+  color: var(--lf-added-text);
+}
+
+.behind {
+  color: var(--lf-modified);
+}
+
+.gone {
+  flex: 0 0 auto;
+  color: var(--lf-warning);
+  font-size: 12px;
+}
+
+.rowActions {
+  display: none;
+  flex: 0 0 auto;
+  gap: 1px;
+}
+
+.row:hover .rowActions,
+.row[data-focused='true'] .rowActions {
+  display: inline-flex;
+}
+
+.rowAction,
+.sectionAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  cursor: pointer;
+}
+
+.rowAction:hover,
+.sectionAction:hover {
+  background: var(--lf-hover);
+  color: var(--lf-fg);
+}
+
+.rowAction[data-on='true'] {
+  color: var(--lf-accent);
+}
+
+/* A favorite's star and a hidden branch's eye stay visible. */
+.row:not(:hover):not([data-focused='true']) .rowActions:has([data-on='true']) {
+  display: inline-flex;
+}
+
+.row:not(:hover):not([data-focused='true']) .rowAction[data-on='false'] {
+  display: none;
+}
+
+.sectionAction {
+  margin-left: auto;
+  opacity: 0;
+  text-transform: none;
+}
+
+.section:hover .sectionAction,
+.section[data-focused='true'] .sectionAction {
+  opacity: 1;
+}
+
+.section .count {
+  margin-left: 2px;
+}
+
+.section .name {
+  flex: 0 1 auto;
+}
+
+.more {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-style: italic;
+}
+
+.empty {
+  padding: 12px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+/* Under a remote never fetched (with the way to fetch it), and after the remotes. */
+.unfetched,
+.addRemote {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding-right: 6px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.unfetched {
+  cursor: default;
+}
+
+.unfetchedText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-style: italic;
+}
+
+.inlineAction {
+  flex: 0 0 auto;
+  height: 18px;
+  padding: 0 5px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-link);
+  font: inherit;
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.inlineAction:hover {
+  background: var(--lf-hover);
+  text-decoration: underline;
+}
+
+.addRemote {
+  margin-top: 6px;
+  padding-left: 4px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.addRemote:hover,
+.unfetched:hover {
+  background: var(--lf-hover);
+}
+
+.addRemote:hover {
+  color: var(--lf-fg);
+}
+
+.tree:focus .unfetched[data-focused='true'],
+.tree:focus .addRemote[data-focused='true'] {
+  box-shadow: inset 0 0 0 1px var(--lf-focus);
+}
+
+.elsewhere {
+  flex: 0 0 auto;
+  color: var(--lf-fg-muted);
+  font-size: 12px;
+}
+
+.worktrees {
+  flex: 0 0 auto;
+  max-height: 40%;
+  overflow-y: auto;
+  border-top: 1px solid var(--lf-hairline);
+  padding: 2px 0 6px;
+}
+
+.worktreeBranch {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}

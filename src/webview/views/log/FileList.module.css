@@ -1,0 +1,306 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 24px;
+  padding-right: 10px;
+  border: none;
+  background: transparent;
+  color: var(--lf-fg);
+  font-size: var(--lf-text-sm);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.row:hover {
+  background: var(--lf-hover);
+}
+
+.row:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: -1px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--lf-radius-xs);
+  font-family: var(--lf-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+
+.added {
+  --c: var(--lf-added);
+}
+
+.modified {
+  --c: var(--lf-modified);
+}
+
+.deleted {
+  --c: var(--lf-deleted);
+}
+
+.renamed {
+  --c: var(--lf-renamed);
+}
+
+.untracked {
+  --c: var(--lf-untracked);
+}
+
+.conflict {
+  --c: var(--lf-conflict);
+}
+
+/* The name gives way last: a long folder path shrinks first. */
+.name {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 75%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.renamedFrom {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.dir {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Keep the end of long directories visible ("…/core/git"). */
+  direction: rtl;
+  text-align: left;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.flex {
+  flex: 1 1 auto;
+}
+
+.folder {
+  color: var(--lf-fg-muted);
+}
+
+.folder .name {
+  color: var(--lf-fg);
+}
+
+.folderIcon {
+  color: var(--lf-fg-muted);
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: 4px;
+}
+
+.numbers {
+  display: inline-flex;
+  gap: 4px;
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.plus {
+  color: var(--lf-added-text);
+}
+
+.minus {
+  color: var(--lf-deleted-text);
+}
+
+.bar {
+  display: inline-flex;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--lf-bg-muted);
+  overflow: hidden;
+}
+
+.barAdded {
+  background: var(--lf-added);
+}
+
+.barDeleted {
+  background: var(--lf-deleted);
+}
+
+.binary {
+  flex: 0 0 auto;
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg-muted);
+}
+
+/* A submodule: the commits it records instead of a diff bar. */
+.submoduleIcon {
+  flex: 0 0 auto;
+  color: var(--lf-fg-muted);
+}
+
+.submodule {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: 4px;
+  color: var(--lf-fg-muted);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+}
+
+.inside {
+  color: var(--lf-modified);
+  font-family: var(--lf-font);
+}
+
+.empty {
+  padding: var(--lf-3);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+}
+
+.toggle:hover {
+  background: var(--lf-hover);
+  color: var(--lf-fg);
+}
+
+/* Rows with actions: the buttons slide in over the end of the row. */
+.item {
+  position: relative;
+}
+
+/* The row itself (an expanded row has its diff under it). */
+.line {
+  position: relative;
+}
+
+/* Expands the row to show the file's diff under it. */
+.chevron {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--lf-fg-muted);
+  cursor: pointer;
+}
+
+.chevron:hover {
+  color: var(--lf-fg);
+}
+
+.chevron:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: -1px;
+}
+
+.actions {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding-left: 12px;
+  /* Over the pane's own background too: a translucent hover (high contrast themes) would let
+     the diff bar show through the buttons. */
+  background:
+    linear-gradient(to right, transparent, var(--lf-hover) 12px),
+    linear-gradient(to right, transparent, var(--lf-bg) 12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.line:hover .actions,
+.line:focus-within .actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.line:hover .row {
+  background: var(--lf-hover);
+}
+
+.action {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg);
+  cursor: pointer;
+}
+
+.action:hover {
+  background: color-mix(in srgb, var(--lf-fg) 12%, transparent);
+}
+
+.action:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: -1px;
+}
+
+.actionDanger:hover {
+  color: var(--lf-error);
+}
+
+/* The file a history view follows. */
+.row[data-emphasized='true'] {
+  box-shadow: inset 2px 0 0 var(--lf-accent);
+  background: color-mix(in srgb, var(--lf-accent) 8%, transparent);
+}
+
+.row[data-emphasized='true'] .name {
+  font-weight: 600;
+}

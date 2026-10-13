@@ -1,0 +1,562 @@
+{
+  "name": "lanefold-git",
+  "displayName": "Lanefold Git Graph",
+  "description": "A Git client built around the commit graph: see the git commands of every operation before it runs, undo it afterwards, and edit history visually.",
+  "version": "0.1.1",
+  "preview": true,
+  "publisher": "EugeneGubenkov",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gubenkoved/lanefold"
+  },
+  "bugs": {
+    "url": "https://github.com/gubenkoved/lanefold/issues"
+  },
+  "homepage": "https://github.com/gubenkoved/lanefold#readme",
+  "qna": "marketplace",
+  "icon": "media/logo/lanefold-256.png",
+  "galleryBanner": {
+    "color": "#1e2241",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Visualization"
+  ],
+  "keywords": [
+    "git",
+    "graph",
+    "commit graph",
+    "history",
+    "rebase",
+    "interactive rebase",
+    "squash",
+    "blame",
+    "compare",
+    "log",
+    "visual"
+  ],
+  "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Lanefold runs git, and a repository's git configuration (hooks, filters, fsmonitor, external diff) can execute code. Trust the workspace to enable it."
+    },
+    "virtualWorkspaces": false
+  },
+  "activationEvents": [
+    "onWebviewPanel:lanefold.editor",
+    "onFileSystem:lanefold"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "lanefold",
+          "title": "Lanefold",
+          "icon": "media/lanefold.svg"
+        }
+      ]
+    },
+    "views": {
+      "lanefold": [
+        {
+          "type": "webview",
+          "id": "lanefold.panel",
+          "name": "Lanefold",
+          "icon": "media/lanefold.svg",
+          "contextualTitle": "Lanefold"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "lanefold.open",
+        "title": "Open",
+        "category": "Lanefold",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "lanefold.openInEditor",
+        "title": "Open in Editor Tab",
+        "category": "Lanefold",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "lanefold.refresh",
+        "title": "Refresh",
+        "category": "Lanefold",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "lanefold.undo",
+        "title": "Undo Last Git Operation",
+        "category": "Lanefold",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "lanefold.redo",
+        "title": "Redo Git Operation",
+        "category": "Lanefold",
+        "icon": "$(redo)"
+      },
+      {
+        "command": "lanefold.showConsole",
+        "title": "Show Git Console",
+        "category": "Lanefold",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "lanefold.showStatistics",
+        "title": "Show Statistics",
+        "category": "Lanefold",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "lanefold.selectRepository",
+        "title": "Select Repository",
+        "category": "Lanefold",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "lanefold.clone",
+        "title": "Clone Repository…",
+        "category": "Lanefold",
+        "icon": "$(repo-clone)"
+      },
+      {
+        "command": "lanefold.init",
+        "title": "Initialize Repository…",
+        "category": "Lanefold",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "lanefold.fileHistory",
+        "title": "File History",
+        "category": "Lanefold",
+        "icon": "$(history)"
+      },
+      {
+        "command": "lanefold.lineHistory",
+        "title": "Line History",
+        "category": "Lanefold",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "lanefold.blame.toggle",
+        "title": "Toggle Blame Annotations",
+        "category": "Lanefold",
+        "icon": "$(person)"
+      },
+      {
+        "command": "lanefold.blame.show",
+        "title": "Show Blame Annotations",
+        "category": "Lanefold",
+        "icon": "$(person)"
+      },
+      {
+        "command": "lanefold.blame.hide",
+        "title": "Hide Blame Annotations",
+        "category": "Lanefold",
+        "icon": "$(person-filled)"
+      },
+      {
+        "command": "lanefold.blame.annotatePrevious",
+        "title": "Annotate Previous Revision",
+        "category": "Lanefold",
+        "icon": "$(history)"
+      },
+      {
+        "command": "lanefold.blame.back",
+        "title": "Blame: Back",
+        "category": "Lanefold",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "lanefold.blame.forward",
+        "title": "Blame: Forward",
+        "category": "Lanefold",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "lanefold.blame.showCommit",
+        "title": "Show Commit in Lanefold",
+        "category": "Lanefold"
+      },
+      {
+        "command": "lanefold.blame.openChanges",
+        "title": "Open the Commit's Changes to This File",
+        "category": "Lanefold"
+      },
+      {
+        "command": "lanefold.blame.copyHash",
+        "title": "Copy Commit Hash",
+        "category": "Lanefold"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "lanefold.openInEditor",
+          "when": "view == lanefold.panel",
+          "group": "navigation@2"
+        },
+        {
+          "command": "lanefold.refresh",
+          "when": "view == lanefold.panel",
+          "group": "navigation@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "lanefold.blame.back",
+          "when": "lanefold.blame.canGoBack && (resourceScheme == file && resourcePath in lanefold.blame.files || resourceScheme == lanefold && resourcePath in lanefold.blame.revisions)",
+          "group": "navigation@-12"
+        },
+        {
+          "command": "lanefold.blame.forward",
+          "when": "lanefold.blame.canGoForward && (resourceScheme == file && resourcePath in lanefold.blame.files || resourceScheme == lanefold && resourcePath in lanefold.blame.revisions)",
+          "group": "navigation@-11"
+        },
+        {
+          "command": "lanefold.blame.show",
+          "when": "(resourceScheme == file && resourcePath not in lanefold.blame.files || resourceScheme == lanefold && resourcePath not in lanefold.blame.revisions) && !isInDiffEditor",
+          "group": "navigation@-10"
+        },
+        {
+          "command": "lanefold.blame.hide",
+          "when": "(resourceScheme == file && resourcePath in lanefold.blame.files || resourceScheme == lanefold && resourcePath in lanefold.blame.revisions) && !isInDiffEditor",
+          "group": "navigation@-10"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "lanefold.blame.toggle",
+          "when": "editorTextFocus && (resourceScheme == file || resourceScheme == lanefold)",
+          "group": "lanefold@1"
+        },
+        {
+          "command": "lanefold.blame.annotatePrevious",
+          "when": "(resourceScheme == file && resourcePath in lanefold.blame.files || resourceScheme == lanefold && resourcePath in lanefold.blame.revisions)",
+          "group": "lanefold@2"
+        },
+        {
+          "command": "lanefold.fileHistory",
+          "when": "resourceScheme == file || resourceScheme == lanefold",
+          "group": "lanefold@3"
+        },
+        {
+          "command": "lanefold.lineHistory",
+          "when": "editorTextFocus && (resourceScheme == file || resourceScheme == lanefold)",
+          "group": "lanefold@4"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "lanefold.blame.show",
+          "when": "false"
+        },
+        {
+          "command": "lanefold.blame.hide",
+          "when": "false"
+        },
+        {
+          "command": "lanefold.blame.toggle",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "lanefold.blame.annotatePrevious",
+          "when": "(resourceScheme == file && resourcePath in lanefold.blame.files || resourceScheme == lanefold && resourcePath in lanefold.blame.revisions)"
+        },
+        {
+          "command": "lanefold.blame.back",
+          "when": "lanefold.blame.canGoBack"
+        },
+        {
+          "command": "lanefold.blame.forward",
+          "when": "lanefold.blame.canGoForward"
+        },
+        {
+          "command": "lanefold.blame.showCommit",
+          "when": "false"
+        },
+        {
+          "command": "lanefold.blame.openChanges",
+          "when": "false"
+        },
+        {
+          "command": "lanefold.blame.copyHash",
+          "when": "false"
+        },
+        {
+          "command": "lanefold.fileHistory",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "lanefold.lineHistory",
+          "when": "editorIsOpen"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "lanefold.fileHistory",
+          "when": "resourceScheme == file",
+          "group": "7_lanefold@1"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "lanefold.fileHistory",
+          "when": "resourceScheme == file || resourceScheme == lanefold",
+          "group": "7_lanefold@1"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "lanefold.open",
+        "key": "ctrl+alt+g",
+        "mac": "cmd+alt+g"
+      },
+      {
+        "command": "lanefold.undo",
+        "key": "ctrl+z",
+        "mac": "cmd+z",
+        "when": "lanefold.graphFocused"
+      },
+      {
+        "command": "lanefold.redo",
+        "key": "ctrl+shift+z",
+        "mac": "cmd+shift+z",
+        "when": "lanefold.graphFocused"
+      },
+      {
+        "command": "lanefold.blame.annotatePrevious",
+        "key": "ctrl+alt+[",
+        "mac": "ctrl+alt+[",
+        "when": "editorTextFocus && (resourceScheme == file && resourcePath in lanefold.blame.files || resourceScheme == lanefold && resourcePath in lanefold.blame.revisions)"
+      },
+      {
+        "command": "lanefold.blame.back",
+        "key": "ctrl+alt+,",
+        "mac": "ctrl+alt+,",
+        "when": "editorTextFocus && lanefold.blame.canGoBack && (resourceScheme == file && resourcePath in lanefold.blame.files || resourceScheme == lanefold && resourcePath in lanefold.blame.revisions)"
+      },
+      {
+        "command": "lanefold.blame.forward",
+        "key": "ctrl+alt+.",
+        "mac": "ctrl+alt+.",
+        "when": "editorTextFocus && lanefold.blame.canGoForward && (resourceScheme == file && resourcePath in lanefold.blame.files || resourceScheme == lanefold && resourcePath in lanefold.blame.revisions)"
+      }
+    ],
+    "configuration": {
+      "title": "Lanefold",
+      "properties": {
+        "lanefold.git.path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "markdownDescription": "Path to the `git` executable. When empty, Lanefold uses the path from VS Code's built-in Git extension, then `git` on `PATH`.",
+          "scope": "machine"
+        },
+        "lanefold.confirm": {
+          "type": "string",
+          "enum": [
+            "always",
+            "destructive",
+            "never"
+          ],
+          "enumDescriptions": [
+            "Show the command preview sheet before every operation.",
+            "Show the preview sheet only for operations that rewrite history or discard work.",
+            "Never ask; commands still appear in the Git Console and can be undone."
+          ],
+          "default": "destructive",
+          "description": "When to show the command preview before running a git operation."
+        },
+        "lanefold.animations": {
+          "type": "string",
+          "enum": [
+            "full",
+            "reduced",
+            "off"
+          ],
+          "default": "full",
+          "description": "Animation level. The OS 'reduce motion' preference always downgrades 'full' to 'reduced'."
+        },
+        "lanefold.graph.style": {
+          "type": "string",
+          "enum": [
+            "curved",
+            "angular"
+          ],
+          "default": "curved",
+          "description": "How lane transitions are drawn in the commit graph."
+        },
+        "lanefold.graph.density": {
+          "type": "string",
+          "enum": [
+            "compact",
+            "comfortable",
+            "spacious"
+          ],
+          "default": "comfortable",
+          "description": "Row height of the commit graph."
+        },
+        "lanefold.graph.colors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Override the lane color palette (CSS colors). Leave empty for the theme-adaptive palette."
+        },
+        "lanefold.log.order": {
+          "type": "string",
+          "enum": [
+            "topo",
+            "date"
+          ],
+          "enumDescriptions": [
+            "Keep each branch's commits together (fewer lanes, easier to read).",
+            "Strict commit-date order (branches interleave)."
+          ],
+          "default": "topo",
+          "description": "Default commit order for new views."
+        },
+        "lanefold.dateFormat": {
+          "type": "string",
+          "enum": [
+            "relative",
+            "absolute"
+          ],
+          "default": "relative",
+          "description": "How commit dates are shown in the graph."
+        },
+        "lanefold.avatars.gravatar": {
+          "type": "boolean",
+          "default": false,
+          "description": "Load author avatars from Gravatar (sends a hash of the author e-mail to gravatar.com). Off by default: initials avatars are used."
+        },
+        "lanefold.views.defaultTabs": {
+          "type": "array",
+          "default": [
+            {
+              "name": "All",
+              "refs": "all"
+            },
+            {
+              "name": "HEAD",
+              "refs": "head"
+            }
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "refs": {
+                "type": "string",
+                "description": "'all', 'head', 'local', or a space-separated list of refs/globs."
+              }
+            }
+          },
+          "description": "Tabs created when Lanefold opens a repository for the first time."
+        },
+        "lanefold.blame.ignoreWhitespace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Blame: ignore whitespace-only changes when finding who last changed a line (git blame -w)."
+        },
+        "lanefold.blame.detectMoves": {
+          "type": "boolean",
+          "default": false,
+          "description": "Blame: follow lines moved or copied within a file to the commit that wrote them (git blame -M)."
+        }
+      }
+    },
+    "resourceLabelFormatters": [
+      {
+        "scheme": "lanefold",
+        "formatting": {
+          "label": "${path} (${query.ref})",
+          "separator": "/",
+          "workspaceSuffix": "",
+          "stripPathStartingSeparator": true
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "build": "npm run build:ext && npm run build:webview",
+    "build:ext": "node esbuild.mjs",
+    "build:webview": "vite build --mode dev",
+    "watch:ext": "node esbuild.mjs --watch",
+    "watch:webview": "vite build --mode dev --watch",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/webview/tsconfig.json && tsc -p test/vscode/tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:git": "vitest run --project git",
+    "pretest:e2e": "npm run build:webview && node esbuild.mjs --harness",
+    "test:e2e": "playwright test",
+    "pretest:perf": "npm run build:webview && node esbuild.mjs --harness",
+    "test:perf": "playwright test -c playwright.perf.config.ts",
+    "pretest:vscode": "npm run build && node esbuild.mjs --tests && node esbuild.mjs --harness && node out/harness/make-demo-repo.mjs out/test/vscode-workspace",
+    "test:vscode": "vscode-test",
+    "harness": "node esbuild.mjs --harness && node out/harness/server.mjs",
+    "demo-repo": "node esbuild.mjs --harness && node out/harness/make-demo-repo.mjs",
+    "package": "vsce package --no-dependencies",
+    "logo": "node dev/render-logo.mjs",
+    "vscode:prepublish": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && node esbuild.mjs --production && vite build --mode production"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "@vscode/codicons": "^0.0.46-44",
+    "motion": "^14.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/vscode": "~1.100.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3",
+    "ws": "^8.22.0"
+  },
+  "vsce": {
+    "dependencies": false
+  }
+}

@@ -1,0 +1,420 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  background: var(--lf-bg);
+}
+
+.scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  animation: pane-in var(--lf-dur-2) var(--lf-ease-out);
+}
+
+/*
+ * Uncommitted changes: the lists scroll above the commit box. A short pane (stacked under the
+ * graph, a low panel) could leave the lists no room: there the whole pane scrolls instead, the
+ * lists at their full height and the box after them.
+ */
+.root[data-worktree] {
+  container: worktree / size;
+}
+
+.workingTree {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.changes {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  animation: pane-in var(--lf-dur-2) var(--lf-ease-out);
+}
+
+@container worktree (max-height: 400px) {
+  .workingTree {
+    overflow-y: auto;
+  }
+
+  .changes {
+    flex: 1 0 auto;
+    overflow: visible;
+  }
+}
+
+@keyframes pane-in {
+  from {
+    opacity: 0.4;
+  }
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--lf-hairline);
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--lf-fg-muted);
+}
+
+.subject {
+  margin: 0;
+  font-size: var(--lf-text-lg);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--lf-fg-strong);
+  overflow-wrap: anywhere;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.identityText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.person {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--lf-text-sm);
+}
+
+.person strong {
+  font-weight: 600;
+}
+
+.email {
+  color: var(--lf-fg-muted);
+}
+
+.when {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.parent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--lf-text-xs);
+}
+
+.parentLabel {
+  color: var(--lf-fg-muted);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--lf-link);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.signed {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--lf-text-xs);
+  color: var(--lf-success);
+}
+
+.body {
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--lf-hairline);
+  font-family: var(--lf-font);
+  font-size: var(--lf-text-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--lf-fg);
+}
+
+.compareGrid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 6px;
+}
+
+.compareGrid > :nth-child(1) {
+  grid-area: 1 / 1;
+}
+
+.compareGrid > :nth-child(2) {
+  grid-area: 1 / 2;
+  justify-self: start;
+}
+
+.compareGrid > .swap {
+  grid-area: 1 / 3 / 3 / 4;
+}
+
+.compareGrid > :nth-child(4) {
+  grid-area: 2 / 1;
+}
+
+.compareGrid > :nth-child(5) {
+  grid-area: 2 / 2;
+  justify-self: start;
+}
+
+.compareLabel {
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.swap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: 50%;
+  background: var(--lf-bg-subtle);
+  color: var(--lf-fg);
+  transition: transform var(--lf-dur-3) var(--lf-ease-spring);
+}
+
+.swap:hover:not(:disabled) {
+  background: var(--lf-hover);
+  transform: rotate(180deg);
+}
+
+.swap:disabled {
+  opacity: 0.4;
+}
+
+.worktreeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px dashed var(--lf-fg-muted);
+  border-radius: var(--lf-radius-pill);
+  font-size: var(--lf-text-sm);
+  font-style: italic;
+  color: var(--lf-fg-muted);
+}
+
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 2px;
+  border-radius: var(--lf-radius);
+  background: var(--lf-bg-muted);
+}
+
+.segmented button {
+  height: 22px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+  transition:
+    background-color var(--lf-dur-2) var(--lf-ease-out),
+    color var(--lf-dur-2) var(--lf-ease-out);
+}
+
+.segmented button[aria-checked='true'] {
+  background: var(--lf-bg);
+  color: var(--lf-fg);
+  box-shadow:
+    var(--lf-shadow-1),
+    0 0 0 1px var(--lf-hairline);
+}
+
+.divergence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: var(--lf-text-sm);
+}
+
+.countLink {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--lf-link);
+  font-size: var(--lf-text-sm);
+  cursor: pointer;
+}
+
+.countLink strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.countLink:disabled {
+  color: var(--lf-fg-muted);
+  cursor: default;
+}
+
+.countLink:not(:disabled):hover {
+  text-decoration: underline;
+}
+
+.mergeBase {
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-start;
+  padding: 10px 12px 14px;
+}
+
+.authors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatarStack {
+  display: inline-flex;
+}
+
+.avatarStack > * {
+  box-shadow: 0 0 0 2px var(--lf-bg);
+}
+
+.avatarStack > * + * {
+  margin-left: -6px;
+}
+
+.touchCount {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg-muted);
+  font-size: 10px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.commitList {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 12px 12px;
+}
+
+.more {
+  padding: 2px var(--lf-1) 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 16px;
+  overflow: auto;
+  /* The pane may be short (stacked under the graph): the hint then sheds what it can. */
+  container: hint / size;
+}
+
+.keys {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg-muted);
+}
+
+.keys dt {
+  justify-self: end;
+  font-family: var(--lf-mono);
+  color: var(--lf-fg);
+}
+
+.keys dd {
+  margin: 0;
+}
+
+/* Stacked under the graph with nothing selected: one line, so the graph keeps the room. */
+.hintLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--lf-hairline);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.hintLine :global(.codicon) {
+  flex: none;
+}
+
+/* Short panes (stacked under the graph) shed the shortcut list, then the illustration. */
+@container hint (max-height: 360px) {
+  .keys {
+    display: none;
+  }
+}
+
+@container hint (max-height: 200px) {
+  .hint :global(svg) {
+    display: none;
+  }
+}

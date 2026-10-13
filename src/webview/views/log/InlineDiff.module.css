@@ -1,0 +1,300 @@
+/* One file's diff under its row in the uncommitted-changes lists, in the editor's diff colours. */
+.root {
+  --lf-diff-surface: var(--vscode-editor-background, var(--lf-bg));
+  --lf-diff-added: var(--vscode-diffEditor-insertedLineBackground, rgba(155, 185, 85, 0.2));
+  --lf-diff-removed: var(--vscode-diffEditor-removedLineBackground, rgba(255, 0, 0, 0.2));
+  --lf-diff-added-edge: transparent;
+  --lf-diff-removed-edge: transparent;
+  /* Picked lines look like selected text in the editor. */
+  --lf-diff-pick: var(--vscode-editor-selectionBackground, var(--lf-selection));
+  --lf-diff-pick-fg: var(--vscode-editor-selectionForeground, var(--lf-fg-strong));
+  --lf-diff-selected: color-mix(in srgb, var(--lf-diff-pick) 40%, transparent);
+  container: inline-diff / inline-size;
+  /* The sticky line numbers stay under the section headers. */
+  isolation: isolate;
+  margin: 0 8px 8px 16px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: var(--lf-radius-sm);
+  overflow: hidden;
+  background: var(--lf-diff-surface);
+  color: var(--lf-fg-strong);
+}
+
+.root:focus {
+  outline: none;
+}
+
+/* High contrast: no tinted lines; changes are marked with the theme's diff borders instead. */
+:global(body.vscode-high-contrast) .root,
+:global(body.vscode-high-contrast-light) .root {
+  --lf-diff-added: transparent;
+  --lf-diff-removed: transparent;
+  --lf-diff-selected: transparent;
+  --lf-diff-added-edge: var(--vscode-diffEditor-insertedTextBorder, var(--lf-added));
+  --lf-diff-removed-edge: var(--vscode-diffEditor-removedTextBorder, var(--lf-deleted));
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  line-height: 1.45;
+}
+
+.note :global(.codicon) {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lf-link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+.note + .hunk,
+.hunk + .hunk {
+  border-top: 1px solid var(--lf-hairline);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  min-height: 26px;
+  padding: 2px 4px 2px 8px;
+  border-bottom: 1px solid var(--lf-hairline);
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg-muted);
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+}
+
+.range {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* The function context takes what room is left (it never pushes the buttons to another line). */
+.section {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-left: auto;
+  font-family: var(--lf-font);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--lf-button-border);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:hover:not([aria-disabled='true']) {
+  background: var(--lf-secondary-hover);
+}
+
+.action:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+.action[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.action :global(.codicon) {
+  font-size: 14px;
+}
+
+.danger:hover:not([aria-disabled='true']) {
+  color: var(--lf-error);
+}
+
+/* A narrow pane: the buttons keep their icon (their name stays in the tooltip and for screen readers). */
+@container inline-diff (max-width: 320px) {
+  .action {
+    padding: 0 3px;
+  }
+
+  .actionLabel {
+    display: none;
+  }
+}
+
+/* Long lines scroll sideways; the line numbers stay in view. */
+.lines {
+  overflow-x: auto;
+  padding: 2px 0;
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-sm);
+  line-height: 18px;
+  tab-size: 4;
+}
+
+.lines:focus {
+  outline: none;
+}
+
+.lines:focus-visible:not(:has([data-cursor])) {
+  box-shadow: inset 0 0 0 1px var(--lf-focus);
+}
+
+.line {
+  --line-bg: transparent;
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  background: var(--line-bg);
+  white-space: pre;
+  user-select: none;
+}
+
+.line[data-kind='added'] {
+  --line-bg: var(--lf-diff-added);
+  cursor: pointer;
+}
+
+.line[data-kind='removed'] {
+  --line-bg: var(--lf-diff-removed);
+  cursor: pointer;
+}
+
+.lines[aria-readonly='true'] .line {
+  cursor: default;
+}
+
+.gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  background: linear-gradient(var(--line-bg), var(--line-bg)), var(--lf-diff-surface);
+  color: var(--vscode-editorLineNumber-foreground, var(--lf-fg-faint));
+}
+
+.number {
+  min-width: calc(var(--digits, 3) * 1ch + 10px);
+  padding: 0 5px;
+  text-align: right;
+}
+
+.sign {
+  width: 2ch;
+  text-align: center;
+}
+
+.line[data-kind='added'] .sign {
+  color: var(--lf-added-text);
+  box-shadow: inset 2px 0 0 var(--lf-diff-added-edge);
+}
+
+.line[data-kind='removed'] .sign {
+  color: var(--lf-deleted-text);
+  box-shadow: inset 2px 0 0 var(--lf-diff-removed-edge);
+}
+
+.text {
+  padding-right: 12px;
+}
+
+/*
+ * Whitespace at the ends of a changed line, drawn as the editor draws whitespace (a bit stronger:
+ * here it may be the whole change).
+ */
+.whitespace {
+  color: var(--lf-fg-faint);
+}
+
+:global(body.vscode-high-contrast) .whitespace,
+:global(body.vscode-high-contrast-light) .whitespace {
+  color: var(--lf-fg-muted);
+}
+
+/* A tab keeps its width; an arrow marks where it starts. */
+.tab {
+  position: relative;
+}
+
+.tab::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+}
+
+.noEol {
+  display: inline-flex;
+  align-items: center;
+  padding-right: 8px;
+  color: var(--lf-fg-faint);
+}
+
+.noEol :global(.codicon) {
+  font-size: 12px;
+}
+
+/* Picked lines: the gutter takes the editor's selection colour, with an accent edge. */
+.line[aria-selected='true'] {
+  background: linear-gradient(var(--lf-diff-selected), var(--lf-diff-selected)), var(--line-bg);
+}
+
+.line[aria-selected='true'] .gutter {
+  background: var(--lf-diff-pick);
+  box-shadow: inset 3px 0 0 var(--lf-accent);
+  color: var(--lf-diff-pick-fg);
+}
+
+.line[aria-selected='true'] .sign {
+  color: inherit;
+}
+
+:global(body.vscode-high-contrast) .line[aria-selected='true'],
+:global(body.vscode-high-contrast-light) .line[aria-selected='true'] {
+  outline: 1px dashed var(--vscode-contrastActiveBorder, var(--lf-focus));
+  outline-offset: -1px;
+}
+
+/* The keyboard's line. */
+.lines:focus-visible .line[data-cursor] {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: -1px;
+}
+
+.hint {
+  padding: 3px 8px 4px;
+  border-top: 1px solid var(--lf-hairline);
+  color: var(--lf-fg-faint);
+  font-size: var(--lf-text-xs);
+}

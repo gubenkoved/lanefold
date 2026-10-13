@@ -1,0 +1,121 @@
+.strip {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.strip::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  max-width: 220px;
+  padding: 0 6px 0 10px;
+  border-radius: var(--lf-radius-sm) var(--lf-radius-sm) 0 0;
+  color: var(--lf-fg-muted);
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    color var(--lf-dur-1) var(--lf-ease-out),
+    background-color var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.tab:hover {
+  color: var(--lf-fg);
+  background: color-mix(in srgb, var(--lf-hover) 60%, transparent);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--vscode-panelTitle-activeForeground, var(--lf-fg-strong));
+}
+
+.tab:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: -2px;
+}
+
+.icon {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--lf-text-sm);
+  letter-spacing: 0.01em;
+}
+
+.rename {
+  width: 120px;
+  height: 20px;
+  padding: 0 4px;
+  border: 1px solid var(--lf-focus);
+  border-radius: var(--lf-radius-xs);
+  background: var(--lf-input-bg);
+  color: var(--lf-input-fg);
+  font-size: var(--lf-text-sm);
+  outline: none;
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--lf-radius-xs);
+  color: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--lf-dur-1) var(--lf-ease-out),
+    background-color var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.close :global(.codicon) {
+  font-size: 12px;
+}
+
+.tab:hover .close,
+.tab[aria-selected='true'] .close,
+.tab:focus-visible .close {
+  opacity: 0.8;
+}
+
+.close:hover {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, var(--lf-hover));
+}
+
+.indicator {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--vscode-panelTitle-activeBorder, var(--lf-accent));
+}
+
+.add {
+  align-self: center;
+  margin-left: 2px;
+}

@@ -1,0 +1,62 @@
+.splitter {
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 5;
+  outline: none;
+  background: var(--lf-hairline);
+}
+
+.splitter[data-orientation='vertical'] {
+  width: 1px;
+  cursor: col-resize;
+}
+
+.splitter[data-orientation='horizontal'] {
+  height: 1px;
+  cursor: row-resize;
+}
+
+/*
+ * A wider invisible hit area (across the bar only: past its ends it would cover the toolbar
+ * above and reach past the window), and the sash highlight VS Code users know.
+ */
+.splitter::before {
+  content: '';
+  position: absolute;
+}
+
+.splitter[data-orientation='vertical']::before {
+  inset: 0 -3px;
+}
+
+.splitter[data-orientation='horizontal']::before {
+  inset: -3px 0;
+}
+
+.splitter::after {
+  content: '';
+  position: absolute;
+  background: var(--vscode-sash-hoverBorder, var(--lf-focus));
+  opacity: 0;
+  transition: opacity var(--lf-dur-2) var(--lf-ease-out) 120ms;
+}
+
+.splitter[data-orientation='vertical']::after {
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 3px;
+}
+
+.splitter[data-orientation='horizontal']::after {
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 3px;
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after,
+.splitter[data-dragging='true']::after {
+  opacity: 1;
+}

@@ -1,0 +1,50 @@
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.body {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.body[data-stacked='true'] {
+  flex-direction: column;
+}
+
+.graph {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.branches {
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  animation: details-in var(--lf-dur-3) var(--lf-ease-out);
+}
+
+.details {
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  animation: details-in var(--lf-dur-3) var(--lf-ease-out);
+}
+
+@keyframes details-in {
+  from {
+    opacity: 0;
+  }
+}

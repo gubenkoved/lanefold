@@ -1,0 +1,684 @@
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  outline: none;
+  overflow: hidden;
+  contain: strict;
+  --lf-row-h: 26px;
+  --lf-col-graph: 48px;
+  --lf-col-author: 168px;
+  --lf-col-date: 104px;
+  --lf-col-sha: 84px;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: var(--lf-col-graph) minmax(0, 1fr) var(--lf-col-author) var(--lf-col-date) var(
+      --lf-col-sha
+    );
+  align-items: center;
+  height: 24px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--lf-hairline);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.headerCell {
+  padding: 0 var(--lf-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.rows {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.ghosts {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--lf-row-h);
+  display: grid;
+  grid-template-columns: var(--lf-col-graph) minmax(0, 1fr) var(--lf-col-author) var(--lf-col-date) var(
+      --lf-col-sha
+    );
+  align-items: center;
+  contain: layout style;
+  will-change: transform;
+  color: var(--lf-fg);
+}
+
+.row[hidden] {
+  display: none;
+}
+
+.row:hover,
+.row.hover {
+  background: var(--lf-hover);
+}
+
+.row.selected {
+  background: var(--lf-selection-inactive);
+}
+
+.root:focus-within .row.selected {
+  background: var(--lf-selection);
+  color: var(--lf-selection-fg);
+}
+
+.row.focused::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--lf-focus);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.root:focus .row.focused::after {
+  opacity: 1;
+}
+
+.row.dim {
+  opacity: 0.38;
+}
+
+.row.match .subject {
+  font-weight: 600;
+}
+
+.cell {
+  min-width: 0;
+  padding: 0 var(--lf-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A dropped column keeps its (empty) grid track, so its cells must take no room at all. */
+.root[data-no-author] .author,
+.root[data-no-author] .headerCell[data-column='author'],
+.root[data-no-sha] .sha,
+.root[data-no-sha] .headerCell[data-column='sha'] {
+  padding: 0;
+  visibility: hidden;
+}
+
+.message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2px;
+}
+
+.subject {
+  /* The subject gives way first: a long one must not squeeze the pills and status chips. */
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.refs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+  max-width: 62%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.refs:empty {
+  display: none;
+}
+
+.pill {
+  --c: var(--lf-fg-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  max-width: 220px;
+  padding: 0 6px 0 4px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+  color: var(--lf-fg);
+  font-size: var(--lf-text-xs);
+  line-height: 16px;
+  white-space: nowrap;
+  /* Long names give way (with an ellipsis) before anything is clipped. */
+  flex: 0 1 auto;
+  min-width: 30px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition:
+    background-color var(--lf-dur-1) var(--lf-ease-out),
+    transform var(--lf-dur-2) var(--lf-ease-spring);
+}
+
+.pill:hover {
+  background: color-mix(in srgb, var(--c) 30%, transparent);
+}
+
+.pill :global(.codicon) {
+  font-size: 12px;
+  color: var(--c);
+  flex: 0 0 auto;
+}
+
+.pillText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pillHead {
+  /* The current branch gives way last (others shrink first), but never runs past the column. */
+  flex-shrink: 0.05;
+  background: var(--c);
+  border-color: var(--c);
+  color: var(--lf-pill-on, #000);
+  font-weight: 600;
+}
+
+.pillHead :global(.codicon) {
+  color: inherit;
+}
+
+.pillHead:hover {
+  background: var(--c);
+  filter: brightness(1.08);
+}
+
+.pillRemote {
+  background: transparent;
+  border-style: dashed;
+  color: var(--lf-fg-muted);
+}
+
+.pillTag {
+  --c: var(--lf-fg-muted);
+  border-color: var(--lf-hairline);
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg);
+}
+
+.pillTag :global(.codicon) {
+  color: var(--lf-fg-muted);
+}
+
+.pillTracking {
+  padding-right: 3px;
+}
+
+.pillUpstream {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.pillHead .pillUpstream {
+  background: color-mix(in srgb, #000 16%, transparent);
+}
+
+.pillMore {
+  --c: var(--lf-fg-muted);
+  flex-shrink: 0;
+  min-width: auto;
+  padding: 0 6px;
+  background: transparent;
+}
+
+.wipChip {
+  display: block;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: 9px;
+  font-size: var(--lf-text-xs);
+  line-height: 18px;
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg);
+  /* In a narrow column they give way with an ellipsis rather than being cut. */
+  flex: 0 1 auto;
+  min-width: 26px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wipStaged {
+  color: var(--lf-added-text);
+}
+
+.wipModified {
+  color: var(--lf-modified);
+}
+
+.wipUntracked {
+  color: var(--lf-untracked);
+}
+
+.wipConflicted {
+  color: var(--lf-conflict);
+}
+
+.wipSubject {
+  font-style: italic;
+  color: var(--lf-fg-muted);
+}
+
+.author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  /* Narrow panels give the column no width: nothing of it may spill into the next one. */
+  overflow: hidden;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--lf-fg);
+}
+
+.authorName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.date {
+  color: var(--lf-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sha {
+  overflow: hidden;
+  font-family: var(--lf-mono);
+  font-size: var(--lf-text-xs);
+  color: var(--lf-fg-muted);
+}
+
+.root:focus-within .row.selected .date,
+.root:focus-within .row.selected .sha {
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* Skeletons while metadata pages in. */
+.loading .subject,
+.loading .authorName,
+.loading .date,
+.loading .sha {
+  color: transparent;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--lf-bg-muted) 0%,
+    color-mix(in srgb, var(--lf-fg) 12%, var(--lf-bg)) 50%,
+    var(--lf-bg-muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+  height: 10px;
+}
+
+.loading .subject {
+  width: 46%;
+}
+
+.loading .authorName {
+  width: 70px;
+}
+
+.loading .avatar {
+  opacity: 0;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* Overview scrollbar: markers are always visible, the thumb shows while scrolling or hovering. */
+.scrollbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  z-index: 3;
+}
+
+.markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.thumb {
+  position: absolute;
+  right: 1px;
+  width: 9px;
+  min-height: 24px;
+  border-radius: 5px;
+  background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
+  opacity: 0;
+  transition:
+    opacity var(--lf-dur-3) var(--lf-ease-out),
+    width var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.scrollbar:hover .thumb,
+.root.scrolling .thumb,
+.thumb.dragging {
+  opacity: 1;
+}
+
+.thumb:hover,
+.thumb.dragging {
+  background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7));
+}
+
+.status {
+  position: absolute;
+  left: 50%;
+  bottom: var(--lf-3);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--lf-radius-pill);
+  background: var(--lf-bg-overlay);
+  box-shadow: var(--lf-shadow-2);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  z-index: 4;
+  pointer-events: none;
+  animation: status-in var(--lf-dur-3) var(--lf-ease-out);
+}
+
+.status[hidden] {
+  display: none;
+}
+
+@keyframes status-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
+/* Status chips (a rebase's progress, bisect verdicts) before a row's ref pills. */
+.mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  padding: 0 6px 0 4px;
+  border-radius: var(--lf-radius-pill);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 35%, transparent);
+  white-space: nowrap;
+}
+
+.mark :global(.codicon) {
+  font-size: 11px !important;
+}
+
+.mark-done,
+.mark-good {
+  --c: var(--lf-success);
+}
+
+.mark-current {
+  --c: var(--lf-warning);
+}
+
+.mark-bad {
+  --c: var(--lf-error);
+}
+
+.mark-pending,
+.mark-muted {
+  --c: var(--lf-fg-muted);
+}
+
+.emptyNote {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lf-1);
+  padding: var(--lf-6);
+  text-align: center;
+  pointer-events: none;
+  /* Over the rows' layer, for its buttons. */
+  z-index: 4;
+  animation: empty-note-in var(--lf-dur-4) var(--lf-ease-out);
+}
+
+.emptyNote[hidden] {
+  display: none;
+}
+
+.emptyTitle {
+  color: var(--lf-fg);
+  font-size: var(--lf-text-lg);
+  font-weight: 600;
+}
+
+.emptyText {
+  max-width: 380px;
+  color: var(--lf-fg-muted);
+  line-height: 1.5;
+}
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--lf-2);
+  margin-top: var(--lf-2);
+  /* The note lets clicks through to the graph; its buttons take them. */
+  pointer-events: auto;
+}
+
+.emptyActions[hidden] {
+  display: none;
+}
+
+.emptyAction {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--lf-button-border);
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-secondary-bg);
+  color: var(--lf-secondary-fg);
+  font: inherit;
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.emptyAction:hover {
+  background: var(--lf-secondary-hover);
+}
+
+.emptyActionMain {
+  background: var(--lf-primary-bg);
+  color: var(--lf-primary-fg);
+}
+
+.emptyActionMain:hover {
+  background: var(--lf-primary-hover);
+}
+
+.emptyAction:focus-visible {
+  outline: 1px solid var(--lf-focus);
+  outline-offset: 2px;
+}
+
+@keyframes empty-note-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+:global(body.vscode-high-contrast) .row.dim,
+:global(body.vscode-high-contrast-light) .row.dim {
+  opacity: 0.6;
+}
+
+/* Just rewritten (history edit): a soft glow that fades. */
+.row.flash {
+  animation: row-flash calc(var(--lf-dur-4) * 4.5) var(--lf-ease-out) both;
+}
+
+@keyframes row-flash {
+  0%,
+  30% {
+    background: color-mix(in srgb, var(--lf-accent) 26%, transparent);
+    box-shadow: inset 3px 0 0 var(--lf-accent);
+  }
+  100% {
+    background: transparent;
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+
+/* Drag and drop: the row under the dragged item, and the item following the pointer. */
+.row.dropTarget {
+  background: color-mix(in srgb, var(--lf-accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--lf-accent);
+}
+
+.pill {
+  touch-action: none;
+}
+
+.dragging,
+.dragging .row,
+.dragging .pill {
+  cursor: grabbing;
+}
+
+.dragGhost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 280px;
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: 11px;
+  background: var(--lf-primary-bg);
+  color: var(--lf-primary-fg);
+  box-shadow: var(--lf-shadow-3);
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  animation: ghost-in var(--lf-dur-2) var(--lf-ease-spring);
+}
+
+@keyframes ghost-in {
+  from {
+    opacity: 0;
+    scale: 0.85;
+  }
+}
+
+/*
+ * The repository of a row, in a log of several: a stripe at the row's start (rows of one
+ * repository form a continuous band). The element is wider than the stripe, for its tooltip.
+ */
+.repoMarker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 9px;
+}
+
+.repoMarker[hidden] {
+  display: none;
+}
+
+.repoMarker::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 4px;
+  background: var(--lf-repo);
+}
