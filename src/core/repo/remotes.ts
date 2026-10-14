@@ -101,6 +101,62 @@ export function validateRemoteUrl(url: string): string | undefined {
   return undefined;
 }
 
+/**
+ * The ref a fetch refspec stores as `ref` (“refs/heads/x” for “refs/remotes/origin/x”, with git's
+ * default “+refs/heads/*:refs/remotes/origin/*”), with how many characters of `ref` the refspec
+ * names outright (the most specific of several refspecs wins); undefined when it does not store
+ * `ref`.
+ */
+export function refspecSource(
+  refspec: string,
+  ref: string,
+): { readonly source: string; readonly exact: number } | undefined {
+  const spec = refspec.startsWith('+') ? refspec.slice(1) : refspec;
+  const colon = spec.indexOf(':');
+  // A negative refspec (“^refs/heads/x”) stores nothing, nor does one without a destination.
+  if (spec.startsWith('^') || colon < 0) return undefined;
+  const source = spec.slice(0, colon);
+  const destination = spec.slice(colon + 1);
+  const star = destination.indexOf('*');
+  if (star < 0)
+    return destination === ref && !source.includes('*') ? { source, exact: ref.length } : undefined;
+  const prefix = destination.slice(0, star);
+  const suffix = destination.slice(star + 1);
+  const sourceStar = source.indexOf('*');
+  if (
+    sourceStar < 0 ||
+    ref.length <= prefix.length + suffix.length ||
+    !ref.startsWith(prefix) ||
+    !ref.endsWith(suffix)
+  )
+    return undefined;
+  const matched = ref.slice(prefix.length, ref.length - suffix.length);
+  return {
+    source: `${source.slice(0, sourceStar)}${matched}${source.slice(sourceStar + 1)}`,
+    exact: prefix.length + suffix.length,
+  };
+}
+
+/**
+ * The remote, and the ref on it, that a remote branch here (“refs/remotes/origin/feature”) stands
+ * for: read from the remotes' fetch settings, as git does (so a remote whose name holds “/” or
+ * whose branches are stored elsewhere is no trouble). Undefined when no remote's settings store it.
+ */
+export function remoteBranchFor(
+  tracking: string,
+  remotes: readonly ConfiguredRemote[],
+): { readonly remote: string; readonly ref: string } | undefined {
+  let best: { remote: string; ref: string; exact: number } | undefined;
+  for (const remote of remotes) {
+    for (const refspec of remote.fetch) {
+      const stored = refspecSource(refspec, tracking);
+      if (stored && (!best || stored.exact > best.exact))
+        best = { remote: remote.name, ref: stored.source, exact: stored.exact };
+    }
+  }
+  return best && { remote: best.remote, ref: best.ref };
+}
+
 /** A local branch whose upstream is a branch of a given remote. */
 export interface TrackingBranch {
   readonly branch: string;

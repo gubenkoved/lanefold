@@ -13,6 +13,7 @@ import type {
   WorkState,
 } from '../../shared/operations';
 import { groupRewrite, splitCommits } from '../../shared/rewrite';
+import { validateRefName } from '../git/args';
 import type { StopRecord } from './opState';
 import type { PlanRecord } from './planner';
 import { diffRefStates, shortRef } from './refState';
@@ -80,6 +81,18 @@ export function validJournal(value: unknown): Journal | undefined {
   };
   const workState = (x: unknown): boolean =>
     record(x) && isObjectId(x.worktree) && /^[0-9a-f]{64}$/.test(String((x as Partial<WorkState>).index));
+  // Written back into git's settings by Undo: branch names that are names, and pairs of text.
+  const branchSettings = (x: unknown): boolean =>
+    record(x) &&
+    Object.entries(x).every(
+      ([branch, pairs]) =>
+        validateRefName(branch) === undefined &&
+        Array.isArray(pairs) &&
+        pairs.every(
+          (pair) =>
+            Array.isArray(pair) && pair.length === 2 && pair.every((part) => typeof part === 'string'),
+        ),
+    );
   const entry = (x: unknown): x is JournalEntry =>
     record(x) &&
     typeof x.id === 'string' &&
@@ -89,6 +102,7 @@ export function validJournal(value: unknown): Journal | undefined {
     optional(x.snapshot, isObjectId) &&
     optional(x.paths, (p) => Array.isArray(p) && p.every((path) => typeof path === 'string')) &&
     optional(x.afterFiles, workState) &&
+    optional(x.branchSettings, branchSettings) &&
     optional(
       x.stash,
       (stash) =>

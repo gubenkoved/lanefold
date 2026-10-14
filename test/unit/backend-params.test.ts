@@ -58,6 +58,25 @@ describe('validJournal', () => {
     ).toBeUndefined();
   });
 
+  it('keeps the settings of deleted branches only for branch names, as pairs of text', () => {
+    const settings = {
+      'feature/x': [
+        ['remote', 'origin'],
+        ['merge', 'refs/heads/feature/x'],
+      ],
+    };
+    expect(validJournal({ undo: [{ ...entry, branchSettings: settings }], redo: [] })?.undo).toHaveLength(1);
+    for (const branchSettings of [
+      { '-x': [['remote', 'origin']] },
+      { 'a..b': [['remote', 'origin']] },
+      { x: [['remote']] },
+      { x: [['remote', 7]] },
+      { x: 'remote=origin' },
+      null,
+    ])
+      expect(validJournal({ undo: [{ ...entry, branchSettings }], redo: [] })).toBeUndefined();
+  });
+
   it('drops a pending entry or stop record that does not check out, keeping the rest', () => {
     const journal = validJournal({ undo: [], redo: [], pending: { title: 7 }, stop: null });
     expect(journal).toEqual({ id: undefined, undo: [], redo: [], pending: undefined, stop: undefined });

@@ -122,6 +122,18 @@ const PUSH_REJECTIONS: [RegExp, string][] = [
   [/\(already exists\)/, 'a tag with that name already exists on the remote.'],
 ];
 
+/** Why a remote refused to delete a branch or tag (`git push --delete`), in plain words. */
+const DELETE_REJECTIONS: [RegExp, string][] = [
+  [
+    /\(stale info\)/,
+    'it changed on the remote since your last fetch, so the lease kept it. Fetch to see what is new there, then delete it again if you still want to.',
+  ],
+  [
+    /\(deletion of the current branch prohibited\)/,
+    'it is the remote’s current branch, which the remote does not let anyone delete.',
+  ],
+];
+
 /** What usually holds files git could not replace. */
 const holders = (count: number) =>
   `another program may have ${count === 1 ? 'it' : 'them'} open, such as an editor, a build or antivirus`;
@@ -170,8 +182,14 @@ export function describeGitFailure(error: GitError): string {
   if (ours) return ours.slice('lanefold: '.length);
   const rejected = raw.find((line) => /^! \[(?:remote )?rejected\]/.test(line));
   if (rejected) {
-    const reason = PUSH_REJECTIONS.find(([pattern]) => pattern.test(rejected));
     const what = rejected.replace(/^! \[(?:remote )?rejected\]\s*/, '');
+    if (error.args[0] === 'push' && error.args.includes('--delete')) {
+      const reason = DELETE_REJECTIONS.find(([pattern]) => pattern.test(rejected));
+      // The remote's reason, in the parentheses that end the line.
+      const why = /\(([^()]+)\)\s*$/.exec(rejected)?.[1];
+      return `Not deleted: ${reason ? reason[1] : `the remote refused${why ? ` (${why})` : ''}.`}`;
+    }
+    const reason = PUSH_REJECTIONS.find(([pattern]) => pattern.test(rejected));
     return reason ? `Push rejected: ${reason[1]}` : `Push rejected: ${what}`;
   }
   const strip = (line: string) => line.replace(/^(?:error|fatal|hint|remote): /, '');

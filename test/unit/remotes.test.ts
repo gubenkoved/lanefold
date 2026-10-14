@@ -4,8 +4,10 @@ import {
   describeRemote,
   parseRemotes,
   remoteBranchesOf,
+  remoteBranchFor,
   validateRemoteName,
   validateRemoteUrl,
+  type ConfiguredRemote,
 } from '../../src/core/repo/remotes';
 import type { RefInfo } from '../../src/shared/models';
 
@@ -152,6 +154,65 @@ describe('remoteBranchesOf', () => {
     expect(remoteBranchesOf(refs, 'team/ci', ['team', 'team/ci'])).toEqual(['refs/remotes/team/ci/main']);
     // Without a remote named team/ci, those branches are team's.
     expect(remoteBranchesOf(refs, 'team', ['team'])).toHaveLength(3);
+  });
+});
+
+describe('remoteBranchFor', () => {
+  const remote = (name: string, ...fetch: string[]): ConfiguredRemote => ({
+    name,
+    urls: [],
+    pushUrls: [],
+    fetch,
+  });
+
+  it('reads the remote and its branch from the fetch settings; nested names take the more specific', () => {
+    const remotes = [
+      remote('origin', '+refs/heads/*:refs/remotes/origin/*'),
+      remote('team', '+refs/heads/*:refs/remotes/team/*'),
+      remote('team/ci', '+refs/heads/*:refs/remotes/team/ci/*'),
+    ];
+    expect(remoteBranchFor('refs/remotes/origin/feature/x', remotes)).toEqual({
+      remote: 'origin',
+      ref: 'refs/heads/feature/x',
+    });
+    expect(remoteBranchFor('refs/remotes/team/ci/main', remotes)).toEqual({
+      remote: 'team/ci',
+      ref: 'refs/heads/main',
+    });
+    expect(remoteBranchFor('refs/remotes/team/main', remotes)).toEqual({
+      remote: 'team',
+      ref: 'refs/heads/main',
+    });
+    // Left behind by a remote that is gone.
+    expect(remoteBranchFor('refs/remotes/old/main', remotes)).toBeUndefined();
+  });
+
+  it('follows settings that store branches under other names, and skips negative ones', () => {
+    const remotes = [
+      remote(
+        'origin',
+        '^refs/heads/team/secret',
+        '+refs/heads/team/*:refs/remotes/origin/mine/*',
+        '+refs/pull/*/head:refs/remotes/origin/pr/*',
+        'refs/heads/main:refs/remotes/origin/trunk',
+        'refs/tags/*',
+      ),
+    ];
+    expect(remoteBranchFor('refs/remotes/origin/mine/x', remotes)).toEqual({
+      remote: 'origin',
+      ref: 'refs/heads/team/x',
+    });
+    // Not a branch: the caller tells.
+    expect(remoteBranchFor('refs/remotes/origin/pr/12', remotes)).toEqual({
+      remote: 'origin',
+      ref: 'refs/pull/12/head',
+    });
+    expect(remoteBranchFor('refs/remotes/origin/trunk', remotes)).toEqual({
+      remote: 'origin',
+      ref: 'refs/heads/main',
+    });
+    expect(remoteBranchFor('refs/remotes/origin/main', remotes)).toBeUndefined();
+    expect(remoteBranchFor('refs/remotes/origin/mine/', remotes)).toBeUndefined();
   });
 });
 

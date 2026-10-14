@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GitError } from '../../src/core/git/errors';
+import { describeGitFailure } from '../../src/core/ops/results';
 import { describeMoves, describeRemoteFailure, refMoves } from '../../src/core/ops/syncResults';
 
 const sha = (n: number) => String(n).repeat(40).slice(0, 40);
@@ -148,5 +149,43 @@ describe('describeRemoteFailure', () => {
       failure(' ! [rejected]        main -> main (fetch first)', ['push', 'origin', 'main']),
     ).toBeUndefined();
     expect(failure('fatal: Connection refused', ['commit', '-m', 'x'])).toBeUndefined();
+  });
+});
+
+describe('a delete the remote refused', () => {
+  const deleting = (stderr: string) =>
+    describeGitFailure(
+      new GitError(
+        [
+          'push',
+          `--force-with-lease=refs/heads/feature:${'a'.repeat(40)}`,
+          'origin',
+          '--delete',
+          'refs/heads/feature',
+        ],
+        1,
+        stderr,
+        '',
+      ),
+    );
+
+  it('says why, in words for a delete rather than a push', () => {
+    expect(
+      deleting(
+        "To /srv/app.git\n ! [rejected]        (delete) -> feature (stale info)\nerror: failed to push some refs to '/srv/app.git'\n",
+      ),
+    ).toBe(
+      'Not deleted: it changed on the remote since your last fetch, so the lease kept it. Fetch to see what is new there, then delete it again if you still want to.',
+    );
+    expect(
+      deleting(
+        "remote: error: refusing to delete the current branch: refs/heads/main\nTo /srv/app.git\n ! [remote rejected] main (deletion of the current branch prohibited)\nerror: failed to push some refs to '/srv/app.git'\n",
+      ),
+    ).toBe('Not deleted: it is the remote’s current branch, which the remote does not let anyone delete.');
+    expect(
+      deleting(
+        "remote: error: GH006: Protected branch update failed for refs/heads/main.\nTo github.com:ann/app.git\n ! [remote rejected] main (protected branch hook declined)\nerror: failed to push some refs to 'github.com:ann/app.git'\n",
+      ),
+    ).toBe('Not deleted: the remote refused (protected branch hook declined).');
   });
 });

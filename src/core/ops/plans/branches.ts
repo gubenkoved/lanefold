@@ -2,26 +2,35 @@
  * Plans for checking out, creating, renaming, moving and deleting branches and tags, and reset.
  */
 
+import type { RefInfo } from '../../../shared/models';
 import { isObjectId } from '../../../shared/oid';
 import type { Operation } from '../../../shared/operations';
 import { revisions, validateRefName } from '../../git/args';
+import { readBranchSettings, readSettingsOfBranches } from '../../repo/branchSettings';
+import { readConfiguredRemotes, remoteBranchFor } from '../../repo/remotes';
+import { readWorktrees } from '../../repo/worktrees';
 import type { PlanBuilder, PlanContext } from '../planner';
 import {
   blockIfInWorktree,
   carryAround,
   commitName,
   commitTitle,
+  count,
   describeDirty,
   describePaths,
   dirtyCount,
   findRef,
   isAncestor,
   orphanedBy,
+  orphanedCommits,
+  plural,
   protectIgnored,
   resolveCommit,
   short,
   warnIfPublished,
 } from './common';
+import { listOf } from './remotes';
+import { deleteOnRemote, remoteBranchTarget, remoteDeleteNotices, type RemoteBranchTarget } from './sync';
 
 /** Why a branch or tag name will not do, for the form field it was typed in. */
 function nameProblem(name: string, what: string): string | undefined {
@@ -206,10 +215,36 @@ export async function planDeleteBranch(
     b.block(`${op.name} is checked out. Switch to another branch first.`, { final: true });
   else
     await blockIfInWorktree(ctx, b, op.name, 'Switch that worktree to another branch, or remove it, first.');
-  const keep = ctx.head.sha && ctx.head.branch !== op.name ? [ctx.head.sha] : [];
-  const orphaned = await orphanedBy(ctx.repo, tip, op.name, keep);
-  // git's rule for -d: merged into the branch's upstream if it has one, else into HEAD.
   const branchInfo = findRef(ctx, op.name, 'branch');
+  // Its upstream, unless the remote deleted it already, if that is a branch there: the sheet
+  // offers to delete it there too.
+  const live =
+    branchInfo?.upstream && !branchInfo.gone ? findRef(ctx, branchInfo.upstream, 'remote') : undefined;
+  const upstream = live && (await remoteBranchTarget(ctx, live.short));
+  b.remoteBranch = upstream?.tracking.short;
+  b.upstreamRemote = upstream?.remote;
+  // Not for good: unticked, the branch is deleted here.
+  if (op.remote && !upstream)
+    b.block(
+      branchInfo?.gone
+        ? `${branchInfo.upstream} is gone from the remote already.`
+        : live
+          ? `${live.short} is not a branch Lanefold can delete from its remote.`
+          : `${op.name} has no upstream on a remote to delete.`,
+    );
+  const target = op.remote ? upstream : undefined;
+  // git deletes the branch's settings with it (its upstream): Undo puts them back.
+  const settings = await readBranchSettings(ctx.repo, op.name);
+  if (settings.length > 0) b.branchSettings = { [op.name]: settings };
+  const keep = ctx.head.sha && ctx.head.branch !== op.name ? [ctx.head.sha] : [];
+  const orphaned = await orphanedBy(
+    ctx.repo,
+    tip,
+    op.name,
+    keep,
+    target && { name: target.tracking.short, tip: target.tracking.target },
+  );
+  // git's rule for -d: merged into the branch's upstream if it has one, else into HEAD.
   const upstreamTip = branchInfo?.upstream ? findRef(ctx, branchInfo.upstream, 'remote')?.target : undefined;
   const mergedInto = upstreamTip ?? ctx.head.sha;
   const merged = mergedInto ? await isAncestor(ctx.repo, tip, mergedInto) : false;
@@ -234,15 +269,301 @@ export async function planDeleteBranch(
   if (orphaned > 0) {
     b.risk('Leaves commits behind');
     b.orphaned = orphaned;
+    const are = orphaned === 1 ? ' is' : 's are';
     b.notice(
       'danger',
-      `${orphaned} commit${orphaned === 1 ? ' is' : 's are'} only on ${op.name} and will no longer be on any branch. Undo brings the branch back.`,
+      target
+        ? `${orphaned} commit${are} only on ${op.name} and ${target.tracking.short}, and will no longer be on any branch. Undo brings ${op.name} back, but not ${target.tracking.short}.`
+        : `${orphaned} commit${are} only on ${op.name} and will no longer be on any branch. Undo brings the branch back.`,
     );
   }
-  const branch = findRef(ctx, op.name, 'branch');
-  if (branch?.upstream) b.notice('info', `The remote branch ${branch.upstream} is not deleted.`);
   b.changes.push({ ref, from: tip });
-  return `Delete branch ${op.name}`;
+  if (target) {
+    deleteOnRemote(b, target, {
+      doneFirst: `${op.name} is deleted here (Undo brings it back), but ${target.tracking.short} is not`,
+    });
+    await remoteDeleteNotices(ctx, b, target, 0, op.name);
+  } else if (live) b.notice('info', `The remote branch ${live.short} is not deleted.`);
+  return target ? `Delete branch ${op.name} and ${target.tracking.short}` : `Delete branch ${op.name}`;
+}
+
+/** A branch a plan deletes, with its upstream as last fetched (none when that is gone). */
+interface DeletedBranch {
+  readonly name: string;
+  readonly tip: string;
+  readonly upstream?: RefInfo;
+}
+
+/**
+ * The branches `git branch -d` deletes: merged into their upstream if they have one, else into
+ * HEAD (git's rule). One `for-each-ref --merged` per commit they are checked against.
+ */
+async function fullyMerged(ctx: PlanContext, branches: readonly DeletedBranch[]): Promise<Set<string>> {
+  const against = new Map<string, string[]>();
+  for (const branch of branches) {
+    const commit = branch.upstream?.target ?? ctx.head.sha;
+    if (commit) against.set(commit, [...(against.get(commit) ?? []), branch.name]);
+  }
+  const merged = new Set<string>();
+  for (const [commit, names] of against) {
+    const { stdout } = await ctx.repo.git(
+      ['for-each-ref', `--merged=${commit}`, '--format=%(refname)', 'refs/heads/'],
+      { readOnly: true, background: true, label: 'Merged branches' },
+    );
+    const listed = new Set(stdout.split('\n'));
+    for (const name of names) if (listed.has(`refs/heads/${name}`)) merged.add(name);
+  }
+  return merged;
+}
+
+export async function planDeleteBranches(
+  ctx: PlanContext,
+  op: Extract<Operation, { kind: 'deleteBranches' }>,
+  b: PlanBuilder,
+) {
+  const names = [...new Set(op.names)];
+  // Git deletes no branch that is checked out, here or in another worktree: those stay.
+  const worktrees = await readWorktrees(ctx.repo).catch(() => []);
+  const missing = names.filter((name) => !ctx.state.refs[`refs/heads/${name}`]);
+  const staying: string[] = [];
+  if (missing.length > 0)
+    staying.push(
+      missing.length === 1
+        ? `There is no branch named ${missing[0]}.`
+        : `There are no branches named ${listOf(missing)}.`,
+    );
+  const branches: DeletedBranch[] = [];
+  for (const name of names) {
+    const tip = ctx.state.refs[`refs/heads/${name}`];
+    if (!tip) continue;
+    const tree = worktrees.find((candidate) => !candidate.current && candidate.branch === name);
+    if (name === ctx.head.branch)
+      staying.push(`${name} is checked out, so it stays: switch to another branch to delete it.`);
+    else if (tree?.prunable)
+      staying.push(
+        `${name} is checked out in a worktree whose folder is gone (${tree.path}), so it stays: prune worktrees first.`,
+      );
+    else if (tree) staying.push(`${name} is checked out in another worktree, ${tree.path}, so it stays.`);
+    else {
+      const upstream = findRef(ctx, name, 'branch')?.upstream;
+      branches.push({ name, tip, upstream: upstream ? findRef(ctx, upstream, 'remote') : undefined });
+    }
+  }
+  if (branches.length === 0) {
+    if (names.length === 0) b.block('There are no branches to delete.', { final: true });
+    for (const reason of staying) b.block(reason, { final: true });
+    return 'Delete branches';
+  }
+  for (const reason of staying) b.notice('info', reason);
+  const deleted = branches.map((branch) => branch.name);
+  const merged = await fullyMerged(ctx, branches);
+  // HEAD keeps its commits (the branch checked out stays).
+  const left = new Set(
+    await orphanedCommits(
+      ctx.repo,
+      branches.map((branch) => branch.tip),
+      deleted,
+      ctx.head.sha ? [ctx.head.sha] : [],
+    ),
+  );
+  const leaving = branches.filter((branch) => left.has(branch.tip)).map((branch) => branch.name);
+  const safe = branches.filter((branch) => merged.has(branch.name));
+  if (safe.length > 0) {
+    const intoUpstream = safe.filter((branch) => branch.upstream);
+    const where =
+      safe.length === 1
+        ? (safe[0]!.upstream?.short ?? 'the current branch')
+        : intoUpstream.length === 0
+          ? 'the current branch'
+          : intoUpstream.length === safe.length
+            ? 'their upstreams'
+            : 'their upstreams or the current branch';
+    b.command(
+      ['branch', '-d', '--end-of-options', ...safe.map((branch) => branch.name)],
+      `Delete ${listOf(safe.map((branch) => branch.name))}; ${safe.length === 1 ? 'its' : 'their'} commits are all in ${where}.`,
+      [['-d', 'delete only if fully merged (git refuses otherwise)']],
+    );
+  }
+  const forced = branches.filter((branch) => !merged.has(branch.name)).map((branch) => branch.name);
+  if (forced.length > 0) {
+    const one = forced.length === 1;
+    b.command(['branch', '-D', '--end-of-options', ...forced], `Delete ${listOf(forced)}.`, [
+      [
+        '-D',
+        leaving.length > 0
+          ? `delete even though some${one ? '' : ' of their'} commits are on no other branch`
+          : one
+            ? 'delete even though it is not merged into the current branch (its commits are kept by other branches)'
+            : 'delete even though they are not merged into the current branch (their commits are kept by other branches)',
+      ],
+    ]);
+  }
+  if (left.size > 0) {
+    b.risk('Leaves commits behind');
+    b.orphaned = left.size;
+    b.notice(
+      'danger',
+      `${plural(left.size, 'commit')} of ${listOf(leaving)} ${left.size === 1 ? 'is' : 'are'} on no other branch and will no longer be on any branch. Undo brings ${deleted.length === 1 ? 'the branch' : 'the branches'} back.`,
+    );
+  }
+  const remoteBranches = branches.flatMap((branch) => (branch.upstream ? [branch.upstream.short] : []));
+  if (remoteBranches.length > 0)
+    b.notice(
+      'info',
+      remoteBranches.length === 1
+        ? `The remote branch ${remoteBranches[0]} is not deleted.`
+        : `The remote branches ${listOf(remoteBranches)} are not deleted.`,
+    );
+  // git deletes the branches' settings with them (their upstreams): Undo puts them back.
+  const settings = await readSettingsOfBranches(ctx.repo, deleted);
+  if (Object.keys(settings).length > 0) b.branchSettings = settings;
+  for (const branch of branches) b.changes.push({ ref: `refs/heads/${branch.name}`, from: branch.tip });
+  if (deleted.length === 1) b.action = 'Delete branch';
+  // Past a few, where each was makes a long confirmation (git's output in the console has it).
+  if (deleted.length > 3) b.doneMessage = `${listOf(deleted, 3)}.`;
+  return deleted.length === 1
+    ? `Delete branch ${deleted[0]}`
+    : `Delete ${plural(deleted.length, 'branch', 'branches')}`;
+}
+
+export async function planSetUpstream(
+  ctx: PlanContext,
+  op: Extract<Operation, { kind: 'setUpstream' }>,
+  b: PlanBuilder,
+) {
+  const title = op.upstream
+    ? `Set the upstream of ${op.branch} to ${op.upstream}`
+    : `Unset the upstream of ${op.branch}`;
+  const branch = findRef(ctx, op.branch, 'branch');
+  if (!branch) {
+    b.block(`There is no branch named ${op.branch}.`, { final: true });
+    return title;
+  }
+  const previous = branch.upstream;
+  const settings = (back: string) =>
+    `This changes ${op.branch}’s settings, not its history: Undo cannot take it back. ${back}`;
+  if (op.upstream === undefined) {
+    if (!previous) {
+      b.block(`${op.branch} has no upstream.`, { final: true });
+      return title;
+    }
+    b.command(
+      ['branch', '--unset-upstream', '--end-of-options', op.branch],
+      `Forget ${op.branch}’s upstream: pull and push no longer go to ${previous} by themselves.`,
+      [['--unset-upstream', 'remove the setting of the branch to pull from and push to']],
+    );
+    b.notice('info', settings(`To go back, set its upstream to ${previous} again.`));
+    b.doneMessage = `${op.branch} has no upstream now: pull needs one, and its next push sets one.`;
+    return `Stop tracking ${previous}`;
+  }
+  const upstream = findRef(ctx, op.upstream, 'remote');
+  if (!upstream) {
+    b.block(`There is no remote branch named ${op.upstream}.`, { final: true });
+    return title;
+  }
+  if (previous === op.upstream) {
+    b.block(`${op.branch} already tracks ${op.upstream}.`, { final: true });
+    return title;
+  }
+  // Git records the remote and its branch from the remote's fetch settings: one must store it.
+  const stored = remoteBranchFor(upstream.name, await readConfiguredRemotes(ctx.repo));
+  if (!stored?.ref.startsWith('refs/heads/')) {
+    b.block(`${op.upstream} is not a branch of a remote of this repository.`, { final: true });
+    return title;
+  }
+  // The full name: a local branch named “origin/x” would make the short one ambiguous.
+  b.command(
+    ['branch', `--set-upstream-to=${upstream.name}`, '--end-of-options', op.branch],
+    `Make ${op.branch} track ${op.upstream}: pull brings in its new commits, and push sends ${op.branch}’s there.`,
+    [['--set-upstream-to', 'the remote branch to pull from and push to']],
+  );
+  const [ahead, behind, related] = await Promise.all([
+    count(ctx.repo, revisions(branch.target, `^${upstream.target}`)),
+    count(ctx.repo, revisions(upstream.target, `^${branch.target}`)),
+    ctx.repo
+      .git(['merge-base', ...revisions(branch.target, upstream.target)], {
+        readOnly: true,
+        background: true,
+        label: 'Common history',
+        okExitCodes: [0, 1],
+      })
+      .then((result) => result.exitCode === 0),
+  ]);
+  const apart = [
+    ahead > 0 ? `${plural(ahead, 'commit')} to push` : '',
+    behind > 0 ? `${plural(behind, 'commit')} to pull` : '',
+  ].filter(Boolean);
+  if (!related)
+    b.notice(
+      'warning',
+      `${op.branch} and ${op.upstream} have no commit in common: git refuses to pull unrelated histories.`,
+    );
+  else
+    b.notice(
+      'info',
+      apart.length > 0
+        ? `As of the last fetch, ${op.branch} has ${apart.join(' and ')}.`
+        : `${op.branch} is at the same commit as ${op.upstream}.`,
+    );
+  b.notice(
+    'info',
+    settings(
+      previous ? `To go back, set its upstream to ${previous} again.` : 'To go back, stop tracking it.',
+    ),
+  );
+  b.doneMessage = `${op.branch} tracks ${op.upstream} now${apart.length > 0 && related ? `: ${apart.join(' and ')}` : ''}.`;
+  return title;
+}
+
+/**
+ * Plans renaming a branch's upstream on its remote too, once the branch is renamed here (`from`
+ * to `to`, at `tip`): pushed there under the new name, which it tracks from then on, then
+ * deleted there under the old one; each leased to the remote as last fetched. Blocked when the
+ * new name is taken there, or when commits only the old one has there would go.
+ */
+async function renameOnRemote(
+  ctx: PlanContext,
+  b: PlanBuilder,
+  target: RemoteBranchTarget,
+  from: string,
+  to: string,
+  tip: string,
+): Promise<void> {
+  const { remote, tracking } = target;
+  if (target.branch === to) {
+    b.block(`${from} tracks ${tracking.short}, which has that name already: rename it here only.`);
+    return;
+  }
+  if (findRef(ctx, `${remote}/${to}`, 'remote'))
+    b.block(`${remote} has a branch named ${to} already.`, { field: 'to' });
+  const [ahead, behind] = await Promise.all([
+    count(ctx.repo, revisions(tip, `^${tracking.target}`)),
+    count(ctx.repo, revisions(tracking.target, `^${tip}`)),
+  ]);
+  if (behind > 0)
+    b.block(
+      `${tracking.short} has ${plural(behind, 'commit')} that ${from} lacks, which renaming it on ${remote} would drop: pull first.`,
+    );
+  b.command(
+    ['push', '--set-upstream', `--force-with-lease=refs/heads/${to}:`, remote, `refs/heads/${to}`],
+    `Publish ${to} on ${remote}, and track it there (if git cannot, ${to} takes back its old name).`,
+    [
+      ['--set-upstream', `remember ${remote}/${to} as ${to}’s upstream (for pull and push)`],
+      ['--force-with-lease', `create ${remote}/${to}, but only if it does not exist yet`],
+    ],
+    { onFailure: ['branch', '-m', '--end-of-options', to, from] },
+  );
+  b.changes.push({ ref: `refs/remotes/${remote}/${to}`, to: tip });
+  if (ahead > 0)
+    b.notice(
+      'info',
+      `${plural(ahead, 'commit')} of ${from} that ${tracking.short} lacks ${ahead === 1 ? 'is' : 'are'} published with it.`,
+    );
+  deleteOnRemote(b, target, {
+    risk: 'Renames it on the remote',
+    doneFirst: `${from} is renamed to ${to}, here and on ${remote}, but ${tracking.short} is still there`,
+  });
+  await remoteDeleteNotices(ctx, b, target, 0, from, to);
 }
 
 export async function planRenameBranch(
@@ -258,6 +579,20 @@ export async function planRenameBranch(
   if (problem) b.block(problem, { field: 'to', missing: same || op.to === '' });
   else if (ctx.state.refs[`refs/heads/${op.to}`])
     b.block(`A branch named ${op.to} already exists.`, { field: 'to' });
+  // Its upstream, unless the remote deleted it already, if that is a branch there: the sheet
+  // offers to rename it there too.
+  const branch = findRef(ctx, op.from, 'branch');
+  const live = branch?.upstream && !branch.gone ? findRef(ctx, branch.upstream, 'remote') : undefined;
+  const upstream = live && (await remoteBranchTarget(ctx, live.short));
+  b.remoteBranch = upstream?.tracking.short;
+  b.upstreamRemote = upstream?.remote;
+  if (op.remote && !upstream)
+    b.block(
+      branch?.gone
+        ? `${branch.upstream} is gone from the remote already.`
+        : `${op.from} has no upstream branch on a remote to rename.`,
+    );
+  const target = op.remote ? upstream : undefined;
   // Until a new name is typed, the command shows where it goes (it cannot run like that).
   b.command(
     ['branch', '-m', '--end-of-options', op.from, same ? '' : op.to],
@@ -266,7 +601,11 @@ export async function planRenameBranch(
   );
   if (op.to && !same)
     b.changes.push({ ref: `refs/heads/${op.from}`, from: tip }, { ref: `refs/heads/${op.to}`, to: tip });
-  return op.to && !same ? `Rename ${op.from} to ${op.to}` : `Rename ${op.from}`;
+  if (target && tip && !problem) await renameOnRemote(ctx, b, target, op.from, op.to, tip);
+  else if (live && !target)
+    b.notice('info', `The remote branch ${live.short} keeps its name, and the branch still tracks it.`);
+  const where = target ? `, here and on ${target.remote}` : '';
+  return op.to && !same ? `Rename ${op.from} to ${op.to}${where}` : `Rename ${op.from}${where}`;
 }
 
 export async function planMoveBranch(

@@ -9,7 +9,7 @@ import { GitRunner } from '../core/git/runner';
 import { RepositoryRegistry } from '../core/repo/registry';
 import type { ConsoleEntry } from '../shared/models';
 import type { ThemeSnapshot } from '../shared/protocol';
-import { hasUntrackedFiles, headStatus } from '../core/repo/branchChoices';
+import { branchChoices, hasUntrackedFiles, headStatus } from '../core/repo/branchChoices';
 import type { Repository } from '../core/repo/repository';
 import type { Operation } from '../shared/operations';
 import { BlameController } from './blame/blameController';
@@ -21,7 +21,7 @@ import { RepoDiscovery } from './repoDiscovery';
 import { RevisionFileSystem } from './revisionFs';
 import { VscodePlatform } from './vscodePlatform';
 import { EditorPanels } from './webviews/editorPanels';
-import { pickBranchToSwitch, pickComparison } from './quickPicks';
+import { pickBranchToDelete, pickBranchToSwitch, pickComparison } from './quickPicks';
 import { StatusBar } from './statusBar';
 import { PANEL_VIEW_ID, PanelViewProvider } from './webviews/panelView';
 
@@ -172,6 +172,29 @@ export class LanefoldApp implements vscode.Disposable {
       command('lanefold.createBranch', async () => {
         const repo = await this.activeRepo();
         if (repo) await this.run(repo, { kind: 'createBranch', name: '', at: 'HEAD', checkout: true });
+      }),
+      command('lanefold.deleteBranch', async () => {
+        const repo = await this.activeRepo();
+        if (!repo) return;
+        const choice = await pickBranchToDelete(repo);
+        if (choice?.kind === 'branch') await this.run(repo, { kind: 'deleteBranch', name: choice.name });
+        // From its remote: always reviewed, Undo cannot bring it back.
+        else if (choice) await this.run(repo, { kind: 'deleteRemoteBranch', name: choice.name }, true);
+      }),
+      command('lanefold.deleteGoneBranches', async () => {
+        const repo = await this.activeRepo();
+        if (!repo) return;
+        // As of the last fetch: one that prunes learns which upstreams were deleted since.
+        const gone = (await branchChoices(repo)).filter((choice) => choice.kind === 'branch' && choice.gone);
+        if (gone.length > 0) {
+          await this.run(repo, { kind: 'deleteBranches', names: gone.map((choice) => choice.name) }, true);
+          return;
+        }
+        const fetch = await vscode.window.showInformationMessage(
+          'Lanefold: no branch’s upstream is gone, as of the last fetch. Fetch and prune to learn which branches were deleted on the remote since.',
+          'Fetch and Prune',
+        );
+        if (fetch) await this.run(repo, { kind: 'fetch', prune: true });
       }),
       command('lanefold.fetch', async () => {
         const repo = await this.activeRepo();

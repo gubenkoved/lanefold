@@ -28,6 +28,7 @@ import {
   type RebaseScript,
 } from '../rebase/rewrite';
 import { editStopCommit, runSplitStep } from '../rebase/split';
+import { removeBranchSettings, restoreBranchSettings } from '../repo/branchSettings';
 import type { RepoData } from '../repo/repoData';
 import type { Repository } from '../repo/repository';
 import { readStashList, stashAt, stashTop } from '../repo/stash';
@@ -81,7 +82,13 @@ import {
   snapshotExists,
   takeSnapshot,
 } from './snapshot';
-import { fetchedDespiteFailure, isSyncOperation, readSyncRefs, syncMessage } from './syncResults';
+import {
+  deletedAlready,
+  fetchedDespiteFailure,
+  isSyncOperation,
+  readSyncRefs,
+  syncMessage,
+} from './syncResults';
 import { pastTense } from './verbs';
 
 const PLAN_TTL_MS = 15 * 60_000;
@@ -96,12 +103,23 @@ export interface RepoOperationsOptions {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Text starting with a capital letter. */
+const capitalized = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+
+/** Two parts of a message as sentences (`second` may be missing): “a was at 1a2b. b is gone.” */
+function sentences(first: string, second: string | undefined): string {
+  if (!second) return first;
+  if (!first) return second;
+  return `${first}${/[.!?]$/.test(first) ? '' : '.'} ${second}`;
+}
+
 /** They change the remote or remote-tracking refs, which Undo cannot (and should not) restore. */
 const NOT_JOURNALED = new Set<OperationKind>([
   'fetch',
   'push',
   'pushTag',
   'deleteRemoteTag',
+  'deleteRemoteBranch',
   // Bisect walks HEAD over commits to test; stopping it returns to where it started.
   'bisectStart',
   'bisectMark',
@@ -116,6 +134,7 @@ const NOT_JOURNALED = new Set<OperationKind>([
   'deinitSubmodules',
   // Git settings, not history.
   'setIdentity',
+  'setUpstream',
   // Remotes: settings and remote branches (each plan says how to go back).
   'addRemote',
   'renameRemote',
@@ -418,6 +437,8 @@ export class RepoOperations {
     };
     /** What the commands that went through printed: files they could not replace, say. */
     const printed: string[] = [];
+    /** The planned command that failed, by index (none ran when it is undefined). */
+    let failedAt: number | undefined;
     try {
       if (record.rewrite) await this.runRewrite(record, env);
       else if (record.split) await runSplitStep(this.repo, record.split, { env, label: plan.title });
@@ -447,6 +468,7 @@ export class RepoOperations {
             // unless git stopped in the middle (a conflict): that waits until it is done.
             if (command.onFailure && !stopped)
               await this.repo.git([...command.onFailure], { env, label: plan.title }).catch(() => undefined);
+            failedAt = index;
             throw error;
           }
         }
@@ -456,6 +478,13 @@ export class RepoOperations {
       // A history edit that could not start: it checks out where it starts first.
       if (!halfDoneTried && !(await readOpState(this.repo)).kind) await putBack(error);
     }
+    // A branch to delete from a remote that the remote had deleted already (the lease expected
+    // it where it was last fetched): what was asked for is done.
+    const goneAlready =
+      failure instanceof GitError
+        ? await deletedAlready(this.repo, plan, failure, plan.title).catch(() => undefined)
+        : undefined;
+    if (goneAlready) failure = undefined;
     // Files git went on past (a checkout does), with their old content still.
     const stale = await staleFiles(this.repo, printed.join('\n'), before.head, { env, label: plan.title });
     // Git stopped at a commit to split: take it apart right away (that is what the plan said).
@@ -657,6 +686,7 @@ export class RepoOperations {
         pathsAfter,
         stash,
         afterFiles: filesAfter,
+        branchSettings: record.branchSettings,
       };
       if (record.rewrite && !failure) rewritten = await this.mapRewritten(rewriteInfo(record));
     }
@@ -676,8 +706,11 @@ export class RepoOperations {
       const counts = plan.rewrite
         ? `${plural(plan.rewrite.before, 'commit')} → ${plan.rewrite.after} · `
         : '';
-      const synced =
-        syncBefore && (await syncMessage(this.repo, plan, syncBefore, before, after).catch(() => undefined));
+      const synced = isSyncOperation(plan.operation)
+        ? (goneAlready ??
+          (syncBefore &&
+            (await syncMessage(this.repo, plan, syncBefore, before, after).catch(() => undefined))))
+        : undefined;
       const title = entry?.title ?? plan.title;
       const from = pending?.before ?? before;
       const refs = describeDone(from, after);
@@ -687,7 +720,7 @@ export class RepoOperations {
           record.doneMessage ??
           synced ??
           // Files changed, not refs (a discard): the headline says it all.
-          `${counts}${entry && refs === NOTHING_CHANGED ? '' : refs}`) +
+          sentences(`${counts}${entry && refs === NOTHING_CHANGED ? '' : refs}`, goneAlready)) +
         (carriedBack ? CARRIED_BACK : '') +
         (savedWork ? SAVED_WORK : '');
       return {
@@ -759,11 +792,14 @@ export class RepoOperations {
       (await this.data.worktreeChanges().catch(() => undefined))?.staged.length
         ? ' The squashed changes are staged: commit them yourself, or discard them.'
         : '';
+    const reason = inSubmodule || (error ? describeGitFailure(error) : String(failure));
+    // What the steps before the one that failed did, which git does not take back: said first.
+    const doneFirst = failedAt === undefined ? undefined : record.doneFirst?.[failedAt];
     return {
       status: 'failed',
       title: plan.title,
       message:
-        (inSubmodule || (error ? describeGitFailure(error) : String(failure))) +
+        (doneFirst ? sentences(doneFirst, capitalized(reason.replace(/^Not deleted: /, ''))) : reason) +
         (halfDone?.putBack.length ? ` ${PUT_BACK}` : '') +
         squashLeft +
         (partly ? ` ${partly}` : ''),
@@ -1115,6 +1151,10 @@ export class RepoOperations {
           entry.kind === 'commit' || entry.kind === 'amendInto',
         );
       moved = true;
+      // Branches it deleted come back with their settings (their upstream); Redo deletes those
+      // again, as git did. The branches matter most: the settings are put back as far as they go.
+      if (entry.branchSettings)
+        await this.settleBranchSettings(entry.branchSettings, to, title).catch(() => undefined);
       if (restoreFiles && entry.paths) await restorePaths(this.repo, entry.snapshot!, entry.paths);
       else if (restoreFiles) await restoreSnapshot(this.repo, entry.snapshot!);
     } catch (error) {
@@ -1162,6 +1202,18 @@ export class RepoOperations {
       // Redone, it can be undone again (the toast offers it).
       entry: direction === 'redo' ? entry : undefined,
     };
+  }
+
+  /** Puts back the settings of branches `to` has, and deletes those of branches it does not. */
+  private async settleBranchSettings(
+    settings: NonNullable<JournalEntry['branchSettings']>,
+    to: RefState,
+    label: string,
+  ): Promise<void> {
+    for (const [branch, values] of Object.entries(settings)) {
+      if (to.refs[`refs/heads/${branch}`]) await restoreBranchSettings(this.repo, branch, values, label);
+      else await removeBranchSettings(this.repo, branch, label);
+    }
   }
 
   /**

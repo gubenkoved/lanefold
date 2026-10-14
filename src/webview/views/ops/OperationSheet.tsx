@@ -290,6 +290,15 @@ function Fields({
   switch (operation.kind) {
     case 'checkout':
       return <CarryOver operation={operation} plan={plan} what="switch" />;
+    case 'deleteBranch':
+      // Only for a branch with an upstream on a remote (or when it was asked for).
+      return plan?.remoteBranch || operation.remote ? (
+        <Checkbox
+          label={`Also delete ${plan?.remoteBranch ?? 'its upstream'} from the remote (Undo cannot bring that back)`}
+          checked={!!operation.remote}
+          onChange={(remote) => editSheet({ ...operation, remote })}
+        />
+      ) : null;
     case 'createBranch':
       return (
         <>
@@ -357,13 +366,23 @@ function Fields({
       );
     case 'renameBranch':
       return (
-        <TextField
-          label="New name"
-          value={operation.to}
-          autoFocus
-          error={errors.to}
-          onChange={(to) => editSheet({ ...operation, to })}
-        />
+        <>
+          <TextField
+            label="New name"
+            value={operation.to}
+            autoFocus
+            error={errors.to}
+            onChange={(to) => editSheet({ ...operation, to })}
+          />
+          {/* Only for a branch with an upstream on a remote (or when it was asked for). */}
+          {plan?.remoteBranch || operation.remote ? (
+            <Checkbox
+              label={`Also rename it on ${plan?.upstreamRemote ?? 'its remote'} (Undo cannot take that back)`}
+              checked={!!operation.remote}
+              onChange={(remote) => editSheet({ ...operation, remote })}
+            />
+          ) : null}
+        </>
       );
     case 'reset':
       return (

@@ -13,6 +13,7 @@ import type {
 } from '../../shared/operations';
 import type { RewriteEntry } from '../../shared/rewrite';
 import type { Range, RebaseScript } from '../rebase/rewrite';
+import type { BranchSettings } from '../repo/branchSettings';
 import type { SplitStep } from '../rebase/split';
 import type { Repository } from '../repo/repository';
 import type { StopRecord } from './opState';
@@ -22,10 +23,12 @@ import {
   planCreateBranch,
   planCreateTag,
   planDeleteBranch,
+  planDeleteBranches,
   planDeleteTag,
   planMoveBranch,
   planRenameBranch,
   planReset,
+  planSetUpstream,
 } from './plans/branches';
 import {
   planApplyFileChanges,
@@ -56,7 +59,14 @@ import {
   planSyncSubmodules,
   planUpdateSubmodules,
 } from './plans/submodules';
-import { planDeleteRemoteTag, planFetch, planPull, planPush, planPushTag } from './plans/sync';
+import {
+  planDeleteRemoteBranch,
+  planDeleteRemoteTag,
+  planFetch,
+  planPull,
+  planPush,
+  planPushTag,
+} from './plans/sync';
 import { planAddWorktree, planPruneWorktrees, planRemoveWorktree } from './plans/worktrees';
 import { actionLabel } from './verbs';
 
@@ -136,6 +146,14 @@ export interface PlanRecord {
   readonly carries?: boolean;
   /** What the confirmation's headline says once it ran (instead of the title in the past tense). */
   readonly outcome?: string;
+  /** Settings of the branches it deletes (see JournalEntry.branchSettings). */
+  readonly branchSettings?: Readonly<Record<string, BranchSettings>>;
+  /**
+   * By index in the commands: what the commands before that one did, which git does not take
+   * back when it fails (a branch deleted here, before deleting it from its remote failed). The
+   * failure says so first.
+   */
+  readonly doneFirst?: Readonly<Record<number, string>>;
 }
 
 /** How a stash operation changes the stash list (journaled so Undo can reverse it). */
@@ -184,6 +202,13 @@ export class PlanBuilder {
   worktree: string | undefined;
   carries = false;
   outcome: string | undefined;
+  /** A branch deletion or rename: the branch's upstream, which it can delete or rename there too. */
+  remoteBranch: string | undefined;
+  /** A rename: the remote of {@link remoteBranch}. */
+  upstreamRemote: string | undefined;
+  branchSettings: Record<string, BranchSettings> | undefined;
+  /** See PlanRecord.doneFirst. */
+  readonly doneFirst: Record<number, string> = {};
 
   command(
     args: string[],
@@ -261,6 +286,15 @@ export async function planOperation(ctx: PlanContext, operation: Operation): Pro
       break;
     case 'deleteBranch':
       title = await planDeleteBranch(ctx, operation, b);
+      break;
+    case 'deleteBranches':
+      title = await planDeleteBranches(ctx, operation, b);
+      break;
+    case 'deleteRemoteBranch':
+      title = await planDeleteRemoteBranch(ctx, operation, b);
+      break;
+    case 'setUpstream':
+      title = await planSetUpstream(ctx, operation, b);
       break;
     case 'renameBranch':
       title = await planRenameBranch(ctx, operation, b);
@@ -419,6 +453,8 @@ export async function planOperation(ctx: PlanContext, operation: Operation): Pro
     risk: b.destructive ? b.risks.join(' · ') || 'Rewrites or discards' : undefined,
     impossible: (b.blocked && b.impossible) || undefined,
     worktree: b.blocked ? b.worktree : undefined,
+    remoteBranch: b.remoteBranch,
+    upstreamRemote: b.upstreamRemote,
   };
   return {
     plan,
@@ -442,5 +478,7 @@ export async function planOperation(ctx: PlanContext, operation: Operation): Pro
     env: b.env,
     carries: b.carries || undefined,
     outcome: b.outcome,
+    branchSettings: b.branchSettings,
+    doneFirst: Object.keys(b.doneFirst).length > 0 ? b.doneFirst : undefined,
   };
 }

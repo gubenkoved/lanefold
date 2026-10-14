@@ -22,6 +22,8 @@ import {
 import { openAllDiffs } from './diffActions';
 import { copyWithToast } from './parts';
 import { editBlocker, headContains } from './reach';
+import { deleteGoneEntries } from './remoteMenu';
+import { goneBranches } from './upstreams';
 
 export interface MenuContext {
   readonly rpc: HostRpc;
@@ -684,6 +686,72 @@ export function showRowMenu(context: MenuContext, row: number, x: number, y: num
 
 const KIND_LABEL: Record<RefInfo['kind'], string> = { branch: 'Branch', remote: 'Remote branch', tag: 'Tag' };
 
+/**
+ * Moving a branch that is not checked out up to its upstream (`live`, as last fetched), when that
+ * only adds commits to it: what a pull would do, without checking it out.
+ */
+function fastForwardEntries(ref: RefInfo, live: RefInfo | undefined): MenuEntry[] {
+  if (ref.isHead || !live || !ref.behind) return [];
+  const own = ref.ahead ?? 0;
+  return [
+    {
+      id: 'fast-forward',
+      label: `Fast-forward to ${live.short}`,
+      icon: 'arrow-down',
+      hint: `git branch --force ${ref.short} ${live.short}`,
+      disabled: own > 0,
+      reason: `${ref.short} has ${own} commit${own === 1 ? '' : 's'} of its own: check it out and pull`,
+      onSelect: () => void runOperation({ kind: 'moveBranch', name: ref.short, to: live.short }),
+    },
+  ];
+}
+
+/** Choosing (or changing) the remote branch a branch tracks, and no longer tracking one. */
+function upstreamEntries(model: LogModel, ref: RefInfo, anchor: MenuAnchor): MenuEntry[] {
+  // Remote branches of the same name first: the usual choice.
+  const name = (r: RefInfo) => r.short.slice(r.short.indexOf('/') + 1);
+  const candidates = model.refs.refs
+    .filter((r) => r.kind === 'remote' && !r.short.endsWith('/HEAD') && r.short !== ref.upstream)
+    .sort(
+      (a, b) =>
+        Number(name(b) === ref.short) - Number(name(a) === ref.short) || a.short.localeCompare(b.short),
+    );
+  const choose: MenuEntry = {
+    id: 'set-upstream',
+    label: ref.upstream ? 'Change upstream…' : 'Set upstream…',
+    icon: 'cloud',
+    hint: `git branch --set-upstream-to=<remote branch> ${ref.short}`,
+    disabled: candidates.length === 0,
+    reason: ref.upstream
+      ? 'There is no other remote branch to track'
+      : 'There is no remote branch to track: publishing the branch sets its upstream',
+    onSelect: () =>
+      openPicker(anchor, {
+        title: `Upstream of ${ref.short}`,
+        placeholder: 'The remote branch to pull from and push to',
+        items: candidates.map((r) => ({
+          value: r.short,
+          label: r.short,
+          icon: 'cloud',
+          group: name(r) === ref.short ? 'Same name' : 'Remote branches',
+        })),
+        onPick: ([upstream]) =>
+          upstream && void runOperation({ kind: 'setUpstream', branch: ref.short, upstream }),
+      }),
+  };
+  if (!ref.upstream) return [choose];
+  return [
+    choose,
+    {
+      id: 'unset-upstream',
+      label: `Stop tracking ${ref.upstream}`,
+      icon: 'debug-disconnect',
+      hint: `git branch --unset-upstream ${ref.short}`,
+      onSelect: () => void runOperation({ kind: 'setUpstream', branch: ref.short }),
+    },
+  ];
+}
+
 /** Merge and rebase entries for a branch's commit: none for the one checked out (itself). */
 function intoHeadEntries(model: LogModel, ref: RefInfo): MenuEntry[] {
   if (ref.isHead) return [];
@@ -735,8 +803,14 @@ export function showRefMenu(
   const upstream = ref.upstream
     ? model.refs.refs.find((r) => r.kind === 'remote' && r.short === ref.upstream)
     : undefined;
+  const remotes = [
+    ...new Set(model.refs.refs.flatMap((r) => (r.kind === 'remote' && r.remote ? [r.remote] : []))),
+  ].sort();
   const refOps: MenuEntry[] = [];
   if (ref.kind === 'branch') {
+    // Its upstream as last fetched (not when the remote deleted it): what pull and push go to.
+    const live = upstream && !ref.gone ? upstream : undefined;
+    const pushedTo = live?.remote ?? (remotes.includes('origin') ? 'origin' : remotes[0]);
     refOps.push(
       // The branch checked out is not checked out, merged or rebased onto again.
       ...(ref.isHead
@@ -774,6 +848,17 @@ export function showRefMenu(
         // Also to a remote never fetched (the first push), and without one: the plan offers to add it.
         onSelect: () => void runOperation({ kind: 'push', branch: ref.short }),
       },
+      // To another remote than its upstream's (a fork, say). One it has stays its upstream.
+      ...remotes
+        .filter((remote) => remote !== pushedTo)
+        .map((remote): MenuEntry => ({
+          id: `push-${remote}`,
+          label: `Push to ${remote}`,
+          icon: 'cloud-upload',
+          hint: `git push ${remote} ${ref.short}`,
+          onSelect: () => void runOperation({ kind: 'push', branch: ref.short, remote }),
+        })),
+      ...fastForwardEntries(ref, live),
       { kind: 'separator' },
       {
         id: 'worktree',
@@ -791,6 +876,7 @@ export function showRefMenu(
         hint: `git branch -m ${ref.short} <new>`,
         onSelect: () => void runOperation({ kind: 'renameBranch', from: ref.short, to: ref.short }),
       },
+      ...upstreamEntries(model, ref, anchor),
       {
         id: 'delete',
         label: 'Delete branch',
@@ -801,6 +887,25 @@ export function showRefMenu(
         reason: 'Check out another branch first',
         onSelect: () => void runOperation({ kind: 'deleteBranch', name: ref.short }),
       },
+      // With its branch on the remote, reviewed: that part cannot be undone. (Not for the branch
+      // checked out: Delete branch says why.)
+      ...(live && !ref.isHead
+        ? ([
+            {
+              id: 'delete-both',
+              label: `Delete branch and ${live.short}…`,
+              icon: 'trash',
+              hint: `git branch -d ${ref.short}, git push ${live.short.replace('/', ' --delete ')}`,
+              danger: true,
+              onSelect: () =>
+                void runOperation({ kind: 'deleteBranch', name: ref.short, remote: true }, { review: true }),
+            },
+          ] satisfies MenuEntry[])
+        : []),
+      // Its upstream is gone, and others' too: all of them at once.
+      ...(ref.gone && goneBranches(model.refs.refs, []).length > 1
+        ? deleteGoneEntries(model.refs.refs, [])
+        : []),
     );
   } else if (ref.kind === 'remote') {
     refOps.push(
@@ -820,11 +925,18 @@ export function showRefMenu(
         onSelect: () => void runOperation({ kind: 'checkout', target: ref.short }),
       },
       ...intoHeadEntries(model, ref),
+      { kind: 'separator' },
+      {
+        id: 'delete-remote',
+        label: `Delete from ${ref.remote ?? 'the remote'}…`,
+        icon: 'trash',
+        hint: `git push ${ref.short.replace('/', ' --delete ')}`,
+        danger: true,
+        // Always reviewed: Undo cannot bring it back.
+        onSelect: () => void runOperation({ kind: 'deleteRemoteBranch', name: ref.short }, { review: true }),
+      },
     );
   } else {
-    const remotes = [
-      ...new Set(model.refs.refs.flatMap((r) => (r.kind === 'remote' && r.remote ? [r.remote] : []))),
-    ].sort();
     refOps.push(
       {
         id: 'checkout',

@@ -7,9 +7,11 @@ import { isObjectId } from '../../../shared/oid';
 import type { Operation } from '../../../shared/operations';
 import { revisions, validateRefName } from '../../git/args';
 import { remoteNames } from '../../git/queries';
+import { branchesTracking, readConfiguredRemotes, remoteBranchFor } from '../../repo/remotes';
 import type { Repository } from '../../repo/repository';
 import type { PlanBuilder, PlanContext } from '../planner';
 import { count, dirtyCount, findRef, plural, predictConflicts, short } from './common';
+import { commitsOnlyOn, listOf } from './remotes';
 
 /** The remote and remote branch name of a remote-tracking ref ("origin/feature/x"). */
 function splitRemoteRef(ref: RefInfo): { remote: string; branch: string } | undefined {
@@ -331,4 +333,154 @@ export async function planDeleteRemoteTag(
     `Everyone who fetches from ${remote} loses the tag; Undo cannot bring it back there. Your local tag stays.`,
   );
   return `Delete tag ${op.name} from ${remote}`;
+}
+
+/** A branch on a remote, and the remote branch here that stands for it. */
+export interface RemoteBranchTarget {
+  readonly remote: string;
+  /** Its full name on the remote (“refs/heads/feature”). */
+  readonly ref: string;
+  /** Its name on the remote (“feature”). */
+  readonly branch: string;
+  /** The remote branch here (“origin/feature”). */
+  readonly tracking: RefInfo;
+}
+
+/**
+ * The branch on a remote that the remote branch `name` (“origin/feature”) stands for, or
+ * undefined after blocking the plan: the remote's fetch settings tell (see remoteBranchFor).
+ * Without `b`, nothing is blocked: whether there is one is the question.
+ */
+export async function remoteBranchTarget(
+  ctx: PlanContext,
+  name: string,
+  b?: PlanBuilder,
+): Promise<RemoteBranchTarget | undefined> {
+  const tracking = findRef(ctx, name, 'remote');
+  if (!tracking) {
+    b?.block(`There is no remote branch named ${name}.`, { final: true });
+    return undefined;
+  }
+  const remotes = await readConfiguredRemotes(ctx.repo);
+  const found = remoteBranchFor(tracking.name, remotes);
+  if (!found) {
+    b?.block(
+      remotes.some((remote) => name.startsWith(`${remote.name}/`))
+        ? `Lanefold cannot tell which branch of the remote ${name} stands for: the remote’s fetch settings do not name it. Delete it in a terminal.`
+        : `${name} belongs to no remote of this repository any more: there is nowhere to delete it from.`,
+      { final: true },
+    );
+    return undefined;
+  }
+  if (!found.ref.startsWith('refs/heads/')) {
+    b?.block(`${name} stands for ${found.ref} on ${found.remote}, which is not a branch.`, { final: true });
+    return undefined;
+  }
+  // A name configured by hand may start with "-": git would read it as an option.
+  if (found.remote.startsWith('-')) {
+    b?.block(`git would read the remote name ${found.remote} as an option: delete it in a terminal.`, {
+      final: true,
+    });
+    return undefined;
+  }
+  return { ...found, branch: found.ref.slice('refs/heads/'.length), tracking };
+}
+
+/**
+ * Plans `git push --delete` of a branch on its remote, leased to the commit it was at when last
+ * fetched: someone's commits pushed since are never deleted unseen. Git deletes the remote
+ * branch here as it pushes. `risk`: what that means, for the sheet's badge; `doneFirst`: what the
+ * steps planned before it did, should it fail (see PlanRecord.doneFirst).
+ */
+export function deleteOnRemote(
+  b: PlanBuilder,
+  target: RemoteBranchTarget,
+  { risk = 'Deletes it from the remote', doneFirst }: { risk?: string; doneFirst?: string } = {},
+): void {
+  const { remote, ref, branch, tracking } = target;
+  if (doneFirst) b.doneFirst[b.commands.length] = doneFirst;
+  b.command(
+    ['push', `--force-with-lease=${ref}:${tracking.target}`, remote, '--delete', ref],
+    `Delete the branch ${branch} from ${remote} (and ${tracking.short} here).`,
+    [
+      [
+        '--force-with-lease',
+        `only if it is still at ${short(tracking.target)}, as last fetched: git refuses if someone pushed to it since`,
+      ],
+      ['--delete', 'remove the branch from the remote'],
+    ],
+  );
+  b.risk(risk);
+  b.changes.push({ ref: tracking.name, from: tracking.target });
+}
+
+/**
+ * What deleting a branch from its remote means: for everyone, for commits only it has
+ * (`orphaned`, 0 when the plan says so itself), for the remote's default branch, and for local
+ * branches tracking it (but `deleted`, going too). `renamedTo`: a rename, which pushed it there
+ * under that name first.
+ */
+export async function remoteDeleteNotices(
+  ctx: PlanContext,
+  b: PlanBuilder,
+  target: RemoteBranchTarget,
+  orphaned: number,
+  deleted?: string,
+  renamedTo?: string,
+): Promise<void> {
+  const { remote, branch, tracking } = target;
+  const them = orphaned === 1 ? 'it' : 'them';
+  if (orphaned > 0) {
+    b.risk('Leaves commits behind');
+    b.orphaned = orphaned;
+  }
+  b.notice(
+    'danger',
+    (renamedTo
+      ? `Everyone who fetches from ${remote} loses ${branch} and gets ${renamedTo} instead; Undo renames the branch back here only, not on ${remote}.`
+      : `Everyone who fetches from ${remote} loses ${branch}; Undo cannot bring it back there.`) +
+      (orphaned > 0
+        ? ` ${plural(orphaned, 'commit')} ${orphaned === 1 ? 'is' : 'are'} only on it: no branch keeps ${them} after that. To keep ${them}, create a branch at ${tracking.short} first.`
+        : ''),
+  );
+  // The remote's default branch, as last fetched (git refuses to delete a bare repository's own).
+  const defaultBranch = await ctx.repo.git(['symbolic-ref', '-q', `refs/remotes/${remote}/HEAD`], {
+    readOnly: true,
+    background: true,
+    label: 'Default branch',
+    okExitCodes: [0, 1, 128],
+  });
+  if (defaultBranch.stdout.trim() === tracking.name)
+    b.notice(
+      'warning',
+      `${branch} is ${remote}’s default branch: the remote will most likely refuse to delete it` +
+        (renamedTo ? `, leaving ${remote} with both ${branch} and ${renamedTo}.` : '.'),
+    );
+  else if (PROTECTED.test(branch))
+    b.notice(
+      'warning',
+      `${branch} looks like a shared branch: ${renamedTo ? 'renaming' : 'deleting'} it affects everyone who uses ${remote}.`,
+    );
+  const tracked = (await branchesTracking(ctx.repo, remote))
+    .filter((local) => local.upstream === tracking.short && local.branch !== deleted)
+    .map((local) => local.branch);
+  if (tracked.length > 0) {
+    const one = tracked.length === 1;
+    b.notice(
+      'info',
+      `${listOf(tracked, 3)} ${one ? 'tracks' : 'track'} it: afterwards, ${one ? 'its' : 'their'} upstream shows as gone, and a push publishes ${one ? 'it' : 'them'} again.`,
+    );
+  }
+}
+
+export async function planDeleteRemoteBranch(
+  ctx: PlanContext,
+  op: Extract<Operation, { kind: 'deleteRemoteBranch' }>,
+  b: PlanBuilder,
+) {
+  const target = await remoteBranchTarget(ctx, op.name, b);
+  if (!target) return `Delete ${op.name}`;
+  deleteOnRemote(b, target);
+  await remoteDeleteNotices(ctx, b, target, await commitsOnlyOn(ctx, [target.tracking.name]));
+  return `Delete branch ${target.branch} from ${target.remote}`;
 }

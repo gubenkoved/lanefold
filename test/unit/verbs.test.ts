@@ -17,6 +17,10 @@ describe('the verbs of operations', () => {
     expect(pastTense('Initialize and update submodules')).toBe('Initialized and updated submodules');
     expect(pastTense('Amend and continue')).toBe('Amended and continued');
     expect(pastTense('Stash changes')).toBe('Stashed changes');
+    expect(pastTense('Delete branch feature from origin')).toBe('Deleted branch feature from origin');
+    expect(pastTense('Delete 3 branches')).toBe('Deleted 3 branches');
+    expect(pastTense('Stop tracking origin/feature')).toBe('Stopped tracking origin/feature');
+    expect(pastTense('Set the upstream of x to origin/x')).toBe('Set the upstream of x to origin/x');
     // Only whole words: “Pushover” is no push.
     expect(pastTense('Pushover')).toBe('Pushover');
     expect(pastTense('New worktree')).toBe('New worktree');
@@ -24,6 +28,14 @@ describe('the verbs of operations', () => {
 
   it('names the run button after what it does', () => {
     expect(actionLabel({ kind: 'deleteBranch', name: 'x' })).toBe('Delete branch');
+    expect(actionLabel({ kind: 'deleteBranch', name: 'x', remote: true })).toBe('Delete both');
+    expect(actionLabel({ kind: 'deleteRemoteBranch', name: 'origin/x' })).toBe('Delete from remote');
+    expect(actionLabel({ kind: 'deleteBranches', names: ['x', 'y'] })).toBe('Delete branches');
+    expect(actionLabel({ kind: 'setUpstream', branch: 'x', upstream: 'origin/x' })).toBe('Set upstream');
+    expect(actionLabel({ kind: 'setUpstream', branch: 'x' })).toBe('Stop tracking');
+    expect(actionLabel({ kind: 'renameBranch', from: 'x', to: 'y' })).toBe('Rename');
+    expect(actionLabel({ kind: 'renameBranch', from: 'x', to: 'y', remote: true })).toBe('Rename both');
+    expect(pastTense('Rename x to y, here and on origin')).toBe('Renamed x to y, here and on origin');
     expect(actionLabel({ kind: 'push', force: true })).toBe('Force push');
     expect(actionLabel({ kind: 'push' })).toBe('Push');
     expect(actionLabel({ kind: 'stashApply', stash: A, pop: true })).toBe('Pop');

@@ -27,8 +27,38 @@ export type Operation =
   | { readonly kind: 'createBranch'; readonly name: string; readonly at: string; readonly checkout?: boolean }
   /** Tell git who you are (user.name, user.email): for every repository, or just this one. */
   | { readonly kind: 'setIdentity'; readonly name: string; readonly email: string; readonly global: boolean }
-  | { readonly kind: 'deleteBranch'; readonly name: string; readonly force?: boolean }
-  | { readonly kind: 'renameBranch'; readonly from: string; readonly to: string }
+  | {
+      readonly kind: 'deleteBranch';
+      readonly name: string;
+      readonly force?: boolean;
+      /** Also delete its upstream from the remote (`git push --delete`), which Undo cannot bring back. */
+      readonly remote?: boolean;
+    }
+  /**
+   * Delete several local branches at once (those whose upstream is gone, say). The one checked
+   * out, and those checked out in other worktrees, stay. Undo brings them all back.
+   */
+  | { readonly kind: 'deleteBranches'; readonly names: readonly string[] }
+  /**
+   * Delete a branch from its remote (`git push --delete`), named by its remote branch here
+   * (“origin/feature”), which goes too: only if it is still where it was last fetched.
+   */
+  | { readonly kind: 'deleteRemoteBranch'; readonly name: string }
+  /**
+   * Make a local branch track a remote branch (“origin/feature”): pull and push go there. Without
+   * `upstream`, it stops tracking the one it has.
+   */
+  | { readonly kind: 'setUpstream'; readonly branch: string; readonly upstream?: string }
+  | {
+      readonly kind: 'renameBranch';
+      readonly from: string;
+      readonly to: string;
+      /**
+       * Also rename its upstream on the remote: push it there under the new name (tracking that),
+       * then delete the old name there. Undo cannot take that part back.
+       */
+      readonly remote?: boolean;
+    }
   /** Point a branch that is not checked out at another commit (`git branch --force`). */
   | { readonly kind: 'moveBranch'; readonly name: string; readonly to: string }
   | { readonly kind: 'createTag'; readonly name: string; readonly at: string; readonly message?: string }
@@ -287,6 +317,13 @@ export interface OperationPlan {
   readonly impossible?: boolean;
   /** Blocked because the branch is checked out in this worktree: opening it there is the way on. */
   readonly worktree?: string;
+  /**
+   * A branch deletion or rename: the branch’s upstream (“origin/feature”), which it can delete
+   * from the remote, or rename there, too.
+   */
+  readonly remoteBranch?: string;
+  /** A rename: the remote of {@link remoteBranch} (“origin”). */
+  readonly upstreamRemote?: string;
 }
 
 export interface RewritePreview {
@@ -347,6 +384,11 @@ export interface JournalEntry {
   readonly stash?: StashChange;
   /** The index and working tree as the operation left them: Undo restores the snapshot only if they still are. */
   readonly afterFiles?: WorkState;
+  /**
+   * The settings of branches it deleted (`branch.<name>.<key>`: their upstream, mostly), which git
+   * deletes with them: Undo puts them back with the branches.
+   */
+  readonly branchSettings?: Readonly<Record<string, readonly (readonly [string, string])[]>>;
 }
 
 export type OperationStatus = 'done' | 'conflicts' | 'stopped' | 'failed' | 'refused';

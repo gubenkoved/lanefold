@@ -240,6 +240,12 @@ export class LogModel {
         : trunk;
   }
 
+  /** Refs that point where they did, with what else they say updated (a branch's upstream). */
+  updateRefs(refs: RefsSnapshot): void {
+    this.setRefs(refs);
+    this.notify();
+  }
+
   /** Updates the uncommitted-changes counts shown on the working-tree row. */
   setWorkingTree(summary: WorkingTreeSummary | undefined): void {
     this.workingTree = summary;

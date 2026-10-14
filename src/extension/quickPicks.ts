@@ -71,6 +71,36 @@ export async function pickBranchToSwitch(repo: Repository): Promise<string | 'cr
   return picked.choice?.name;
 }
 
+/**
+ * Picks a branch to delete: local branches (not the one checked out), most recently committed
+ * first, then remote branches. Resolves the choice, or undefined if dismissed or there is none.
+ */
+export async function pickBranchToDelete(repo: Repository): Promise<BranchChoice | undefined> {
+  const choices = await branchChoices(repo);
+  const local = choices.filter((choice) => choice.kind === 'branch' && !choice.current);
+  const remotes = choices.filter((choice) => choice.kind === 'remote');
+  if (local.length === 0 && remotes.length === 0) {
+    void vscode.window.showInformationMessage(
+      'Lanefold: there is no branch to delete (the one checked out stays).',
+    );
+    return undefined;
+  }
+  const items: BranchItem[] = [];
+  const section = (label: string, list: readonly BranchChoice[]) => {
+    if (list.length === 0) return;
+    items.push({ label, kind: vscode.QuickPickItemKind.Separator }, ...list.map(item));
+  };
+  section('Branches', local);
+  // Deleted from their remote, after a review.
+  section('Remote branches', remotes);
+  const picked = await vscode.window.showQuickPick(items, {
+    title: `Delete branch — ${repo.name}`,
+    placeHolder: 'Type to find a branch',
+    matchOnDetail: true,
+  });
+  return picked?.choice;
+}
+
 /** Picks two revisions to compare (the current branch is offered first). */
 export async function pickComparison(repo: Repository): Promise<{ a: string; b: string } | undefined> {
   const choices = await branchChoices(repo);

@@ -104,7 +104,7 @@ export class LogLoader {
   }
 
   onRepoChanged(kinds: readonly RepoChangeKind[]): void {
-    for (const kind of kinds) if (kind !== 'config') this.changedKinds.add(kind);
+    for (const kind of kinds) this.changedKinds.add(kind);
     if (this.changedKinds.size === 0) return;
     clearTimeout(this.changeTimer);
     this.changeTimer = setTimeout(() => this.applyChanges(), CHANGE_DEBOUNCE_MS);
@@ -116,10 +116,37 @@ export class LogLoader {
       this.stale = true;
       return;
     }
-    const onlyWorkingTree = [...this.changedKinds].every((kind) => kind === 'index' || kind === 'worktree');
+    const kinds = new Set(this.changedKinds);
     this.changedKinds.clear();
-    if (onlyWorkingTree && this.displayed) void this.refreshWorkingTree(this.displayed);
-    else this.load(true);
+    const settings = kinds.delete('config');
+    const onlyWorkingTree = [...kinds].every((kind) => kind === 'index' || kind === 'worktree');
+    // A reload reads the refs anew too.
+    if (!onlyWorkingTree || !this.displayed) {
+      this.load(true);
+      return;
+    }
+    if (kinds.size > 0) void this.refreshWorkingTree(this.displayed);
+    if (settings) void this.refreshRefs(this.displayed);
+  }
+
+  /**
+   * Settings changed (a branch's upstream, say): the refs show it, but point where they did, so
+   * the history stays as it is. (One repository's view: the view of several reloads on refs only.)
+   */
+  private async refreshRefs(model: LogModel): Promise<void> {
+    try {
+      const refs = await this.rpc.call('repo.refs', { repoId: this.repoId });
+      if (this.disposed || model !== this.displayed) return;
+      const was = new Map(model.refs.refs.map((ref) => [ref.name, ref.target]));
+      const same =
+        refs.head.sha === model.refs.head.sha &&
+        refs.refs.length === was.size &&
+        refs.refs.every((ref) => was.get(ref.name) === ref.target);
+      // Refs that moved meanwhile: their own change reloads the history.
+      if (same) model.updateRefs(refs);
+    } catch {
+      // Closed meanwhile; or the next change brings them.
+    }
   }
 
   /** Edits and staging only change the uncommitted-changes row: update it without a reload. */

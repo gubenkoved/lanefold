@@ -2,7 +2,7 @@
   "name": "lanefold-git",
   "displayName": "Lanefold Git Graph",
   "description": "A Git client built around the commit graph: see the git commands of every operation before it runs, undo it afterwards, and edit history visually.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "preview": true,
   "publisher": "EugeneGubenkov",
   "license": "MIT",
@@ -132,6 +132,18 @@
         "title": "Create Branch…",
         "category": "Lanefold",
         "icon": "$(git-branch-create)"
+      },
+      {
+        "command": "lanefold.deleteBranch",
+        "title": "Delete Branch…",
+        "category": "Lanefold",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "lanefold.deleteGoneBranches",
+        "title": "Delete Branches Whose Upstream Is Gone…",
+        "category": "Lanefold",
+        "icon": "$(trash)"
       },
       {
         "command": "lanefold.fetch",

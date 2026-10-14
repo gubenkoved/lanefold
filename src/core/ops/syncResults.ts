@@ -8,7 +8,7 @@ import type { Operation, OperationPlan, RefState } from '../../shared/operations
 import type { GitError } from '../git/errors';
 import { remoteNames } from '../git/queries';
 import type { Repository } from '../repo/repository';
-import { plural } from '../util/wording';
+import { plural, short } from '../util/wording';
 
 /** Remote branches and tags by full name, with the object each points to. */
 export type SyncRefs = ReadonlyMap<string, string>;
@@ -19,6 +19,7 @@ const SYNC_KINDS: ReadonlySet<Operation['kind']> = new Set([
   'push',
   'pushTag',
   'deleteRemoteTag',
+  'deleteRemoteBranch',
 ]);
 
 /** Operations that talk to a remote (their results are worded here). */
@@ -227,6 +228,65 @@ function tagMessage(plan: OperationPlan): string | undefined {
   return undefined;
 }
 
+/** The branch a plan deletes from a remote, from its `git push … <remote> --delete <ref>`. */
+function remoteDeletion(
+  plan: OperationPlan,
+): { readonly remote: string; readonly ref: string; readonly tracking?: string } | undefined {
+  const args = plan.commands.find(
+    (command) => command.args[0] === 'push' && command.args.includes('--delete'),
+  )?.args;
+  const at = args?.indexOf('--delete') ?? -1;
+  const remote = args?.[at - 1];
+  const ref = args?.[at + 1];
+  if (!remote || !ref?.startsWith('refs/heads/')) return undefined;
+  // The remote branch here it deletes too (the plan says so in its changes).
+  const tracking = plan.changes.find((change) => change.ref.startsWith('refs/remotes/') && !change.to)?.ref;
+  return { remote, ref, tracking };
+}
+
+/** A branch deleted from a remote, and where it was (its remote branch here was read before). */
+function deletedMessage(plan: OperationPlan, before: SyncRefs): string | undefined {
+  const deletion = remoteDeletion(plan);
+  if (!deletion) return undefined;
+  const was = deletion.tracking ? before.get(deletion.tracking) : undefined;
+  const branch = deletion.ref.slice('refs/heads/'.length);
+  return `Deleted ${branch} from ${deletion.remote}.${was ? ` It was at ${short(was)}.` : ''}`;
+}
+
+/**
+ * Whether a push that was to delete a branch from a remote failed because the remote had deleted
+ * it already (a merged pull request's branch, say): the lease expected it where it was last
+ * fetched. Asks the remote; if it is gone there, the remote branch here that still stood for it
+ * goes too, as it would have. Returns what happened, in words, or undefined (a real failure).
+ */
+export async function deletedAlready(
+  repo: Repository,
+  plan: OperationPlan,
+  error: GitError,
+  label: string,
+): Promise<string | undefined> {
+  const deletion = remoteDeletion(plan);
+  if (
+    !deletion ||
+    error.args[0] !== 'push' ||
+    !error.args.includes('--delete') ||
+    !/\(stale info\)/.test(error.stderr)
+  )
+    return undefined;
+  const listed = await repo.git(['ls-remote', deletion.remote, deletion.ref], { readOnly: true, label });
+  if (listed.stdout.split('\n').some((line) => line.split('\t')[1] === deletion.ref)) return undefined;
+  const branch = deletion.ref.slice('refs/heads/'.length);
+  const lease = error.args.find((arg) => arg.startsWith(`--force-with-lease=${deletion.ref}:`));
+  const expected = lease?.slice(`--force-with-lease=${deletion.ref}:`.length);
+  // Only if it is still where it was (a fetch meanwhile may have moved it, or taken it away).
+  const forgotten =
+    !!deletion.tracking &&
+    !!expected &&
+    (await repo.git(['update-ref', '-d', deletion.tracking, expected], { label, okExitCodes: [0, 1, 128] }))
+      .exitCode === 0;
+  return `${deletion.remote} had deleted ${branch} already.${forgotten ? ` ${deletion.tracking!.slice('refs/remotes/'.length)} is gone from here now too.` : ''}`;
+}
+
 /**
  * What a fetch, pull or push that ran did, in words; `before` are the remote branches and tags
  * read before it ran, `stateBefore`/`stateAfter` the local branches.
@@ -248,6 +308,8 @@ export async function syncMessage(
     case 'pushTag':
     case 'deleteRemoteTag':
       return tagMessage(plan);
+    case 'deleteRemoteBranch':
+      return deletedMessage(plan, before);
     default:
       return undefined;
   }

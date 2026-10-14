@@ -23,27 +23,69 @@ export const dirtyCount = (tree: WorkingTreeSummary) => tree.staged + tree.unsta
 /**
  * Commits reachable from `tip` that no other branch, tag or remote-tracking branch holds (nor
  * anything reachable from `keep`): after the operation they would only be in the reflog.
- * `excludeBranch` is the (short) branch that is about to move or disappear.
+ * `excludeBranch` is the (short) branch that is about to move or disappear; `alsoRemote` a
+ * remote branch (short name, and its commit) that disappears with it.
  */
 export async function orphanedBy(
   repo: Repository,
   tip: string,
   excludeBranch: string | undefined,
   keep: string[],
+  alsoRemote?: { readonly name: string; readonly tip: string },
 ): Promise<number> {
-  // --exclude matches the short name with --branches (and the full name in some versions).
-  const exclude = excludeBranch
-    ? [`--exclude=${excludeBranch}`, `--exclude=refs/heads/${excludeBranch}`]
-    : [];
-  return count(repo, [
+  return count(
+    repo,
+    orphanArgs(
+      [tip, ...(alsoRemote ? [alsoRemote.tip] : [])],
+      excludeBranch ? [excludeBranch] : [],
+      keep,
+      alsoRemote?.name,
+    ),
+  );
+}
+
+/**
+ * What {@link orphanedBy} counts, for several branches that disappear together: the commits
+ * reachable from any of `tips` that no branch but `excludeBranches` (short names) holds, nor a
+ * tag, a remote-tracking branch or anything reachable from `keep`. A branch leaves commits
+ * behind exactly when its tip is one of them.
+ */
+export async function orphanedCommits(
+  repo: Repository,
+  tips: readonly string[],
+  excludeBranches: readonly string[],
+  keep: readonly string[],
+): Promise<string[]> {
+  if (tips.length === 0) return [];
+  const { stdout } = await repo.git(['rev-list', ...orphanArgs(tips, excludeBranches, keep)], {
+    readOnly: true,
+    background: true,
+    label: 'Commits left behind',
+  });
+  return stdout.split('\n').filter(Boolean);
+}
+
+/** `git rev-list` arguments for the commits of `tips` that no other ref, nor `keep`, holds. */
+function orphanArgs(
+  tips: readonly string[],
+  excludeBranches: readonly string[],
+  keep: readonly string[],
+  excludeRemote?: string,
+): string[] {
+  // --exclude matches the short name with --branches and --remotes (and the full name in some
+  // versions); it applies to the next of them only.
+  const exclude = (names: readonly string[], prefix: string) =>
+    names.flatMap((name) => [`--exclude=${name}`, `--exclude=${prefix}${name}`]);
+  return [
     '--not',
-    ...exclude,
+    ...exclude(excludeBranches, 'refs/heads/'),
     '--branches',
     '--tags',
+    ...exclude(excludeRemote ? [excludeRemote] : [], 'refs/remotes/'),
     '--remotes',
     '--not',
-    ...revisions(tip, ...keep.map((k) => `^${k}`)),
-  ]);
+    ...revisions(...tips, ...keep.map((k) => `^${k}`)),
+  ];
 }
 
 /** Files git would stop on: `git merge-tree --write-tree` (git ≥ 2.38), never touches the tree. */

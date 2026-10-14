@@ -28,11 +28,16 @@ function RepoChip() {
     : undefined;
 
   const showMenu = async (anchor: Element) => {
-    const [known, submodules] = await Promise.all([
+    const [known, submodules, refs] = await Promise.all([
       // Opened as the view loads, before the remotes are known: they are asked for first.
       remotes ?? host.rpc.call('repo.remotes', { repoId: repo.id }).catch(() => []),
       // The submodules, with their actions: also where the branches pane does not fit.
       host.rpc.call('submodule.list', { repoId: repo.id }).catch(() => []),
+      // For the branches whose upstream on a remote is gone.
+      host.rpc
+        .call('repo.refs', { repoId: repo.id })
+        .then((snapshot) => snapshot.refs)
+        .catch(() => []),
     ]);
     const entries: MenuEntry[] = [
       { kind: 'header', label: 'Repositories' },
@@ -73,7 +78,7 @@ function RepoChip() {
       // Here too, for narrow views (where the branches pane steps aside).
       { kind: 'separator' },
       { kind: 'header', label: 'Remotes' },
-      ...remotesMenuEntries(known),
+      ...remotesMenuEntries(known, refs),
     );
     if (host.kind !== 'harness') {
       entries.push(
@@ -140,7 +145,8 @@ function UndoButtons() {
 function SyncButtons() {
   const host = useHost();
   const repoId = useApp((state) => state.activeRepoId);
-  const version = useRepoVersion(host.rpc, repoId ?? '');
+  // The settings say what the branch tracks.
+  const version = useRepoVersion(host.rpc, repoId ?? '', ['refs', 'head', 'config']);
   const refs = useQuery(repoId ? `${repoId}:${version}` : undefined, () =>
     host.rpc.call('repo.refs', { repoId: repoId! }),
   );

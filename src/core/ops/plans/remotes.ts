@@ -41,7 +41,7 @@ const text = (value: unknown): string => (typeof value === 'string' ? value : ''
 const remoteBranches = (n: number) => `${n} remote branch${n === 1 ? '' : 'es'}`;
 
 /** "a", "a and b", "a, b and c"; past `max` items, "a, b, c, d, e and 3 more". */
-function listOf(items: readonly string[], max = 5): string {
+export function listOf(items: readonly string[], max = 5): string {
   if (items.length <= 1) return items.join('');
   if (items.length <= max) return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
   return `${items.slice(0, max).join(', ')} and ${items.length - max} more`;
@@ -166,8 +166,8 @@ export async function planRenameRemote(
   return title;
 }
 
-/** Commits on these remote branches that no branch, tag, other remote branch or HEAD has. */
-async function commitsOnlyOn(ctx: PlanContext, branches: readonly string[]): Promise<number> {
+/** Commits on these remote branches (full names) that no branch, tag, other remote branch or HEAD has. */
+export async function commitsOnlyOn(ctx: PlanContext, branches: readonly string[]): Promise<number> {
   const mine = new Set(branches);
   const others = ctx.refs.refs
     .filter((ref) => ref.kind === 'remote' && !mine.has(ref.name))

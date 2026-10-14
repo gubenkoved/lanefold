@@ -15,8 +15,15 @@ export function actionLabel(operation: Operation): string {
     case 'setIdentity':
       return 'Save';
     case 'deleteBranch':
-      return 'Delete branch';
+      return operation.remote ? 'Delete both' : 'Delete branch';
+    case 'deleteBranches':
+      return 'Delete branches';
+    case 'deleteRemoteBranch':
+      return 'Delete from remote';
+    case 'setUpstream':
+      return operation.upstream === undefined ? 'Stop tracking' : 'Set upstream';
     case 'renameBranch':
+      return operation.remote ? 'Rename both' : 'Rename';
     case 'renameRemote':
       return 'Rename';
     case 'moveBranch':
@@ -148,6 +155,7 @@ const PAST: readonly (readonly [string, string])[] = [
   ['Stop', 'Stopped'],
   ['Sync', 'Synced'],
   ['Take', 'Took'],
+  ['Unset', 'Unset'],
   ['Update', 'Updated'],
 ];
 

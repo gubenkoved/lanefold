@@ -52,15 +52,21 @@ shows the git commands it will use, and every change it makes to the repository 
 ### Branches and remotes
 
 - A branches pane with folders, remotes, tags, favorites and ahead/behind counts.
-- Fetch, pull and push, with results in plain words. Force pushes always use
-  `--force-with-lease`.
+- Fetch, pull and push, with results in plain words. Force pushes, and deleting or renaming
+  branches on a remote, always use `--force-with-lease`.
+- Delete branches locally, from their remote, or both at once; rename a branch here and on its
+  remote; set, change or stop the upstream a branch tracks; fast-forward a branch without checking
+  it out; push a branch to any remote; fetch and prune the remote branches deleted on the remote.
+- Clean up after merged pull requests: the branches whose upstream is gone are deleted all at
+  once, after a review that lists each, and Undo brings them back.
 - Add, edit and remove remotes. Credential prompts appear as VS Code input boxes.
 - A status bar item with the checked-out branch and its commits to push and to pull. Click it to
   switch branches: recently used ones come first, each with its last commit and how far ahead or
   behind it is. While a merge, rebase, cherry-pick, revert, patch or bisect is stopped, it says
   so, with the number of conflicts.
-- Switch Branch, Create Branch, Fetch, Pull, Push, Stash Changes and Compare Branches from the
-  Command Palette, reviewed and undoable like Lanefold's own buttons.
+- Switch Branch, Create Branch, Delete Branch, Delete Branches Whose Upstream Is Gone, Fetch,
+  Pull, Push, Stash Changes and Compare Branches from the Command Palette, reviewed and undoable
+  like Lanefold's own buttons.
 
 ![The Switch Branch picker over the Lanefold graph, with recent branches first, and the branch in the status bar](https://gist.githubusercontent.com/gubenkoved/66fff765499dc9a41fddfc132bbf5861/raw/switch-branch.png)
 

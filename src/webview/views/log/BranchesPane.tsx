@@ -12,9 +12,10 @@ import { addRemote, useRemotes } from '../../state/remotes';
 import { useApp } from '../../state/store';
 import type { TabModel } from '../../state/tabs';
 import { copyWithToast, useCommitColor, useModelVersion } from './parts';
-import { fetchRemote, removeRemote, renameRemote, showRemoteMenu } from './remoteMenu';
+import { deleteGoneEntries, fetchRemote, removeRemote, renameRemote, showRemoteMenu } from './remoteMenu';
 import { openLinkedRepository } from './submodules';
 import { SubmodulesSection } from './SubmodulesSection';
+import { remoteOfName } from './upstreams';
 import styles from './BranchesPane.module.css';
 
 /** Refs listed per section before "N more" (a filter finds the rest). */
@@ -197,10 +198,7 @@ function visibleRows(sections: readonly Section[], collapsed: ReadonlySet<string
  * "/"), else what precedes its first "/".
  */
 function remoteOf(ref: RefInfo, remotes: readonly string[]): string {
-  let owner: string | undefined;
-  for (const name of remotes)
-    if (ref.short.startsWith(`${name}/`) && (owner === undefined || name.length > owner.length)) owner = name;
-  return owner ?? ref.remote ?? '';
+  return remoteOfName(ref.short, remotes) ?? ref.remote ?? '';
 }
 
 function refTitle(ref: RefInfo): string {
@@ -502,7 +500,25 @@ export function BranchesPane({ repoId, tab, model, selection, onReveal, onMenu }
       .join(' · ');
   };
   const remoteMenu = (remote: string, anchor: Element | { x: number; y: number }) =>
-    showRemoteMenu(anchor, remote, configuredRemotes ?? []);
+    showRemoteMenu(anchor, remote, configuredRemotes ?? [], refs);
+  /** The Branches section's: a new branch, and deleting the branches whose upstream is gone. */
+  const branchesMenu = (anchor: Element | { x: number; y: number }) =>
+    openMenu(anchor, [
+      { kind: 'title', label: 'Branches' },
+      {
+        id: 'new-branch',
+        label: 'New branch…',
+        icon: 'git-branch-create',
+        hint: 'git switch -c <name>',
+        disabled: !head || head.unborn,
+        reason: 'There is no commit to start it at yet',
+        onSelect: () => void runOperation({ kind: 'createBranch', name: '', at: 'HEAD', checkout: true }),
+      },
+      ...deleteGoneEntries(
+        refs,
+        (configuredRemotes ?? []).map((remote) => remote.name),
+      ),
+    ]);
 
   const toggle = (id: string) => {
     const next = new Set(collapsed);
@@ -598,19 +614,25 @@ export function BranchesPane({ repoId, tab, model, selection, onReveal, onMenu }
       );
     } else if (row.type === 'ref' && event.key === 'F2' && row.ref.kind === 'branch') {
       void runOperation({ kind: 'renameBranch', from: row.ref.short, to: row.ref.short });
-    } else if (row.type === 'ref' && event.key === 'Delete' && !row.ref.isHead && row.ref.kind !== 'remote') {
+    } else if (row.type === 'ref' && event.key === 'Delete' && !row.ref.isHead) {
       void runOperation(
         row.ref.kind === 'tag'
           ? { kind: 'deleteTag', name: row.ref.short }
-          : { kind: 'deleteBranch', name: row.ref.short },
+          : row.ref.kind === 'remote'
+            ? { kind: 'deleteRemoteBranch', name: row.ref.short }
+            : { kind: 'deleteBranch', name: row.ref.short },
+        // From a remote, always reviewed: Undo cannot bring it back.
+        { review: row.ref.kind === 'remote' },
       );
     } else if (
       row.type === 'section' &&
-      row.remote !== undefined &&
+      (row.remote !== undefined || row.id === 'local') &&
       (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey))
     ) {
       // From the keyboard, at the row (its first entry active).
-      remoteMenu(row.remote, rowElement(row) ?? { x: 0, y: 0 });
+      const anchor = rowElement(row) ?? { x: 0, y: 0 };
+      if (row.remote !== undefined) remoteMenu(row.remote, anchor);
+      else branchesMenu(anchor);
     } else if (
       row.type === 'section' &&
       row.remote !== undefined &&
@@ -765,11 +787,13 @@ export function BranchesPane({ repoId, tab, model, selection, onReveal, onMenu }
                 toggle(row.id);
               }}
               onContextMenu={
-                remote !== undefined
+                remote !== undefined || row.id === 'local'
                   ? (event) => {
                       event.preventDefault();
                       setFocus(row.id);
-                      remoteMenu(remote, { x: event.clientX, y: event.clientY });
+                      const at = { x: event.clientX, y: event.clientY };
+                      if (remote !== undefined) remoteMenu(remote, at);
+                      else branchesMenu(at);
                     }
                   : undefined
               }
