@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.2
+
+- A status bar item shows the checked-out branch and how it stands against its upstream (commits
+  to push and to pull, as of the last fetch). Click it to switch branches. While git is stopped
+  in a merge, rebase, cherry-pick, revert, patch or bisect, it says so, with the number of
+  conflicts, and opens Lanefold.
+- New commands in the Command Palette:
+  - Switch Branch… lists recently used branches first, then branches by latest commit, then
+    remote branches, each with its last commit and how far ahead or behind it is.
+  - Create Branch…, Fetch, Pull, Push, Stash Changes… and Compare Branches….
+  - They run the way Lanefold's own buttons do: reviewed when needed, with Undo afterwards.
+- Lanefold starts after VS Code has finished starting up, so the status bar item is there from
+  the start.
+
 ## 0.1.1
 
 - Operations no longer get stuck half-done when git cannot replace a file because another

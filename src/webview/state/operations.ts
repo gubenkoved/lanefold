@@ -112,6 +112,23 @@ function beyond(headline: string, message: string): string | undefined {
   return message.slice(headline.length).replace(/^[.;:,]?\s*/, '') || undefined;
 }
 
+/** Resolves once `repoId` is the active repository (the host selects it first), or false. */
+function whenActive(repoId: string): Promise<boolean> {
+  if (activeRepo() === repoId) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      unsubscribe();
+      resolve(false);
+    }, 3000);
+    const unsubscribe = useApp.subscribe((state) => {
+      if (state.activeRepoId !== repoId) return;
+      clearTimeout(timer);
+      unsubscribe();
+      resolve(true);
+    });
+  });
+}
+
 /** Reports a result: success with Undo, conflicts, or what went wrong. */
 export function report(
   result: OperationResult,
@@ -470,6 +487,20 @@ export function connectOperations(): void {
       void refreshOpState(repoId);
   });
 
+  // From the command palette (switch branch, fetch, push…): the same flow as a button here.
+  rpc.on('command.run', ({ command, args }) => {
+    if (command === 'runOperation') {
+      const { repoId, operation, review } = (args ?? {}) as {
+        repoId?: unknown;
+        operation?: { kind?: unknown };
+        review?: unknown;
+      };
+      if (typeof repoId !== 'string' || typeof operation?.kind !== 'string') return;
+      void whenActive(repoId).then(
+        (active) => active && void runOperation(operation as Operation, { review: review === true }),
+      );
+    }
+  });
   let lastRepo: string | undefined;
   useApp.subscribe((state) => {
     if (state.activeRepoId === lastRepo) return;

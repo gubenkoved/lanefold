@@ -9,7 +9,9 @@ import { GitRunner } from '../core/git/runner';
 import { RepositoryRegistry } from '../core/repo/registry';
 import type { ConsoleEntry } from '../shared/models';
 import type { ThemeSnapshot } from '../shared/protocol';
+import { hasUntrackedFiles, headStatus } from '../core/repo/branchChoices';
 import type { Repository } from '../core/repo/repository';
+import type { Operation } from '../shared/operations';
 import { BlameController } from './blame/blameController';
 import { getBuiltinGitApi } from './builtinGit';
 import { cloneRepository, initRepository } from './cloneInit';
@@ -19,6 +21,8 @@ import { RepoDiscovery } from './repoDiscovery';
 import { RevisionFileSystem } from './revisionFs';
 import { VscodePlatform } from './vscodePlatform';
 import { EditorPanels } from './webviews/editorPanels';
+import { pickBranchToSwitch, pickComparison } from './quickPicks';
+import { StatusBar } from './statusBar';
 import { PANEL_VIEW_ID, PanelViewProvider } from './webviews/panelView';
 
 const ACTIVE_REPO_KEY = 'lanefold.activeRepo';
@@ -75,6 +79,7 @@ export class LanefoldApp implements vscode.Disposable {
         },
       ),
       this.blame,
+      new StatusBar(this.registry),
       this.registry.onDidChangeRepos(() => {
         void context.workspaceState.update(ACTIVE_REPO_KEY, this.registry.active?.id);
       }),
@@ -156,6 +161,45 @@ export class LanefoldApp implements vscode.Disposable {
         await this.ready;
         await this.lineHistory();
       }),
+      command('lanefold.switchBranch', async () => {
+        const repo = await this.activeRepo();
+        if (!repo) return;
+        const target = await pickBranchToSwitch(repo);
+        if (target === 'create')
+          await this.run(repo, { kind: 'createBranch', name: '', at: 'HEAD', checkout: true });
+        else if (target) await this.run(repo, { kind: 'checkout', target });
+      }),
+      command('lanefold.createBranch', async () => {
+        const repo = await this.activeRepo();
+        if (repo) await this.run(repo, { kind: 'createBranch', name: '', at: 'HEAD', checkout: true });
+      }),
+      command('lanefold.fetch', async () => {
+        const repo = await this.activeRepo();
+        if (repo) await this.run(repo, { kind: 'fetch' });
+      }),
+      command('lanefold.pull', async () => {
+        const repo = await this.activeRepo();
+        if (!repo) return;
+        // With commits of its own the branch has diverged: rebasing them is reviewed first.
+        const { ahead } = await headStatus(repo);
+        await this.run(repo, { kind: 'pull', mode: ahead > 0 ? 'rebase' : 'ff-only' }, ahead > 0);
+      }),
+      command('lanefold.push', async () => {
+        const repo = await this.activeRepo();
+        if (repo) await this.run(repo, { kind: 'push' });
+      }),
+      command('lanefold.stash', async () => {
+        const repo = await this.activeRepo();
+        if (!repo) return;
+        // Untracked files too when there are any, as Lanefold's own Stash buttons do.
+        await this.run(repo, { kind: 'stashPush', includeUntracked: await hasUntrackedFiles(repo) });
+      }),
+      command('lanefold.compare', async () => {
+        const repo = await this.activeRepo();
+        if (!repo) return;
+        const picked = await pickComparison(repo);
+        if (picked) await this.runInView(repo, 'openCompare', { repoId: repo.id, ...picked });
+      }),
       command('lanefold.selectRepository', async () => {
         await this.ready;
         const repos = this.registry.all;
@@ -236,6 +280,22 @@ export class LanefoldApp implements vscode.Disposable {
     } finally {
       cancel.dispose();
     }
+  }
+
+  /** The repository commands act on (the active one), or undefined after saying there is none. */
+  private async activeRepo(): Promise<Repository | undefined> {
+    await this.ready;
+    const repo = this.registry.active;
+    if (!repo) void vscode.window.showInformationMessage('Lanefold: no git repository is open.');
+    return repo;
+  }
+
+  /**
+   * Runs an operation from the command palette the way a button in Lanefold does: planned,
+   * reviewed when it needs to be, with Undo in its confirmation.
+   */
+  private run(repo: Repository, operation: Operation, review = false): Promise<void> {
+    return this.runInView(repo, 'runOperation', { repoId: repo.id, operation, review });
   }
 
   /** Shows a commit in the Lanefold graph (opening the panel and waiting for it if needed). */

@@ -2,7 +2,7 @@
   "name": "lanefold-git",
   "displayName": "Lanefold Git Graph",
   "description": "A Git client built around the commit graph: see the git commands of every operation before it runs, undo it afterwards, and edit history visually.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "preview": true,
   "publisher": "EugeneGubenkov",
   "license": "MIT",
@@ -53,6 +53,7 @@
     "virtualWorkspaces": false
   },
   "activationEvents": [
+    "onStartupFinished",
     "onWebviewPanel:lanefold.editor",
     "onFileSystem:lanefold"
   ],
@@ -119,6 +120,48 @@
         "title": "Show Statistics",
         "category": "Lanefold",
         "icon": "$(graph)"
+      },
+      {
+        "command": "lanefold.switchBranch",
+        "title": "Switch Branch…",
+        "category": "Lanefold",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "lanefold.createBranch",
+        "title": "Create Branch…",
+        "category": "Lanefold",
+        "icon": "$(git-branch-create)"
+      },
+      {
+        "command": "lanefold.fetch",
+        "title": "Fetch",
+        "category": "Lanefold",
+        "icon": "$(repo-fetch)"
+      },
+      {
+        "command": "lanefold.pull",
+        "title": "Pull",
+        "category": "Lanefold",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "lanefold.push",
+        "title": "Push",
+        "category": "Lanefold",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "lanefold.stash",
+        "title": "Stash Changes…",
+        "category": "Lanefold",
+        "icon": "$(git-stash)"
+      },
+      {
+        "command": "lanefold.compare",
+        "title": "Compare Branches…",
+        "category": "Lanefold",
+        "icon": "$(git-compare)"
       },
       {
         "command": "lanefold.selectRepository",

@@ -15,6 +15,7 @@ import { mark } from '../perf';
 import { requestReveal } from './reveal';
 import { adoptSharedTab, noteSharedTab, SHARED_TAB_KEY, withSharedTab } from './sharedTab';
 import {
+  compareTitle,
   CONSOLE_TAB_ID,
   consoleTab,
   defaultTabs,
@@ -287,6 +288,14 @@ export async function connectStore(connection: HostConnection): Promise<void> {
       void tabsReady.then(() => showInLog(repoId, sha));
     } else if (command === 'openFileHistory' || command === 'openLineHistory') {
       void tabsReady.then(() => openHistoryFromHost(command, args));
+    } else if (command === 'openCompare') {
+      const { repoId, a, b } = (args ?? {}) as { repoId?: unknown; a?: unknown; b?: unknown };
+      if (typeof repoId !== 'string' || typeof a !== 'string' || typeof b !== 'string') return;
+      void tabsReady.then(() => {
+        if (useApp.getState().activeRepoId !== repoId) return;
+        const compare = { a, b, mode: 'three-dot' as const };
+        useApp.getState().addTab({ kind: 'compare', title: compareTitle(compare), compare });
+      });
     }
   });
   rpc.on('app.resync', () => void initialize());

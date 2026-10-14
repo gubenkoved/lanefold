@@ -4,7 +4,7 @@ Lanefold is a Git client for VS Code built around the commit graph. You browse h
 operations, edit commits and review changes from the graph. Before an operation runs, Lanefold
 shows the git commands it will use, and every change it makes to the repository can be undone.
 
-![Lanefold in VS Code: the commit graph with the branches pane, and uncommitted changes staged hunk by hunk](media/screenshot.png)
+![Lanefold in VS Code: the commit graph with the branches pane, and uncommitted changes staged hunk by hunk](https://gist.githubusercontent.com/gubenkoved/66fff765499dc9a41fddfc132bbf5861/raw/screenshot.png)
 
 ## Features
 
@@ -55,6 +55,14 @@ shows the git commands it will use, and every change it makes to the repository 
 - Fetch, pull and push, with results in plain words. Force pushes always use
   `--force-with-lease`.
 - Add, edit and remove remotes. Credential prompts appear as VS Code input boxes.
+- A status bar item with the checked-out branch and its commits to push and to pull. Click it to
+  switch branches: recently used ones come first, each with its last commit and how far ahead or
+  behind it is. While a merge, rebase, cherry-pick, revert, patch or bisect is stopped, it says
+  so, with the number of conflicts.
+- Switch Branch, Create Branch, Fetch, Pull, Push, Stash Changes and Compare Branches from the
+  Command Palette, reviewed and undoable like Lanefold's own buttons.
+
+![The Switch Branch picker over the Lanefold graph, with recent branches first, and the branch in the status bar](https://gist.githubusercontent.com/gubenkoved/66fff765499dc9a41fddfc132bbf5861/raw/switch-branch.png)
 
 ### More
 
@@ -72,7 +80,8 @@ Lanefold needs VS Code 1.100 or later and git 2.30 or later. Conflict prediction
 or later.
 
 Open it with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd>
-on macOS) or run **Lanefold: Open** from the Command Palette.
+on macOS) or run **Lanefold: Open** from the Command Palette. Every command is under
+**Lanefold:** there.
 
 ### Keyboard
 
@@ -147,6 +156,11 @@ gives webviews, captured by the integration tests with `LANEFOLD_CAPTURE_THEMES=
 
 `npm run package` builds the VSIX, and `npm run logo` renders the PNG sizes of the logo from
 `media/logo/lanefold.svg`.
+
+The README's screenshots are in `media/`, and copies are in a
+[secret gist](https://gist.github.com/gubenkoved/66fff765499dc9a41fddfc132bbf5861) that the
+README links to, since the Marketplace cannot load images from this private repository. After
+changing a screenshot, push it to the gist too (`git clone https://gist.github.com/66fff765499dc9a41fddfc132bbf5861.git`).
 
 ### Architecture
 
