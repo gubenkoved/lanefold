@@ -33,7 +33,7 @@ import { readWorktrees } from '../repo/worktrees';
 import { checkLineCounting, checkStatsQuery, checkStatsScope, StatsService } from '../stats/repoStats';
 import { DisposableStore, Emitter, type Disposable } from '../util/emitter';
 import { paths } from '../util/paths';
-import { checkCount, checkFilePaths, checkOneOf, checkRev } from './params';
+import { checkCount, checkFilePaths, checkObjectId, checkOneOf, checkRev } from './params';
 import type { Platform } from './platform';
 import { openReposLog } from './reposLog';
 
@@ -392,6 +392,8 @@ export class Backend implements Disposable {
       'repo.workingTree': ({ repoId }) => this.data(repoId).workingTree({ shared: true }),
       'repo.worktreeChanges': ({ repoId }) => this.data(repoId).worktreeChanges({ shared: true }),
       'commit.details': ({ repoId, sha }) => this.data(repoId).commitDetails(sha),
+      'commit.containedIn': ({ repoId, sha }, { signal }) =>
+        this.data(repoId).refsContaining(checkObjectId(sha), signal),
       'reflog.list': ({ repoId, limit }) => readReflog(this.repo(repoId), checkCount(limit, 5000)),
       'worktree.list': ({ repoId }) => readWorktrees(this.repo(repoId)),
       'repo.remotes': ({ repoId }) => this.data(repoId).remotes({ shared: true }),

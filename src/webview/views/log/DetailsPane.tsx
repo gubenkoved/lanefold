@@ -15,6 +15,7 @@ import { fetchCommitDetails, useQuery, useRepoVersion } from '../../state/querie
 import { showStashes } from '../../state/store';
 import { openStats, STATS_ICON } from '../stats/statsTab';
 import { CommitBox } from './CommitBox';
+import { ContainedIn } from './ContainedIn';
 import { openAllDiffs, openFileDiff, sideLabel } from './diffActions';
 import { FileAction, FileList, totals, TreeToggle } from './FileList';
 import { commitFileEntries, fileMenu, type FileMenuScope } from './fileMenus';
@@ -202,11 +203,13 @@ function Identity({
 }
 
 function CommitHeader({
+  repoId,
   meta,
   model,
   onReveal,
   stats,
 }: {
+  repoId: string;
   meta: CommitMeta;
   model: LogModel;
   onReveal: (sha: string) => void;
@@ -247,6 +250,7 @@ function CommitHeader({
         ) : null}
       </div>
       {refs.length > 0 ? <RefPills refs={refs} /> : null}
+      <ContainedIn repoId={repoId} model={model} sha={meta.sha} onReveal={onReveal} />
     </header>
   );
 }
@@ -265,7 +269,7 @@ function CommitDetailsView({ repoId, model, sha, onReveal, scope }: DetailsPaneP
   const isMerge = meta.parents.length > 1;
   return (
     <div className={styles.scroll}>
-      <CommitHeader meta={meta} model={model} onReveal={onReveal} stats={!scope} />
+      <CommitHeader repoId={repoId} meta={meta} model={model} onReveal={onReveal} stats={!scope} />
       {current?.body ? <pre className={styles.body}>{current.body}</pre> : null}
       {isMerge ? (
         <Notice icon="git-merge">

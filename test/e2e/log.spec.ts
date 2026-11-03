@@ -27,6 +27,32 @@ test('the graph shows history, details and opens diffs', async ({ page }) => {
     .toBe(true);
 });
 
+test('a commit’s details say which branches and tags contain it, and go to them', async ({ page }) => {
+  await open(page);
+  const details = page.getByRole('complementary', { name: 'Commit details' });
+  const containing = details.getByRole('definition');
+
+  // Merged into main: in main (checked out, first), the branches made since, and the release.
+  await graphRow(page, 'Validate credentials on submit').click();
+  await expect(details.getByRole('term').filter({ hasText: 'Branches' })).toContainText('5');
+  await expect(containing.first().getByRole('button')).toHaveText([
+    'main',
+    'feature/login',
+    'feature/search',
+    'origin/main',
+    'origin/feature/search',
+  ]);
+  await expect(containing.nth(1).getByRole('button')).toHaveText(['v1.0.0']);
+
+  // An older commit (found by searching: it is far down) is in both tags, the oldest first;
+  // choosing one selects its commit.
+  await page.getByRole('textbox', { name: /Search commits/ }).fill('forecast API client');
+  await expect(graphRow(page, 'Add forecast API client')).toHaveAttribute('aria-selected', 'true');
+  await expect(containing.nth(1).getByRole('button')).toHaveText(['v0.1.0', 'v1.0.0']);
+  await containing.nth(1).getByRole('button', { name: 'Go to v1.0.0' }).click();
+  await expect(graphRow(page, 'Polish dashboard layout')).toHaveAttribute('aria-selected', 'true');
+});
+
 test('two selected commits compare; a range shows its combined changes', async ({ page }) => {
   await open(page);
   const details = page.getByRole('complementary', { name: 'Commit details' });

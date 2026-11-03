@@ -1,0 +1,115 @@
+/* What contains a commit: a label column ("Branches 3", "Tags 12") beside wrapping pills. */
+.root {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 4px 8px;
+  margin: 0;
+}
+
+.root dt,
+.root dd {
+  margin: 0;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.count {
+  font-weight: 400;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 6px 0 4px;
+  border: 1px solid var(--lf-hairline);
+  border-radius: 9px;
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg);
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.ref:hover {
+  background: var(--lf-hover);
+}
+
+.ref :global(.codicon) {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--lf-fg-muted);
+}
+
+/* A very long name ends in an ellipsis (the full name is the tooltip). */
+.refText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ref[data-kind='head'] {
+  border-color: var(--lf-accent);
+}
+
+.ref[data-kind='tag'] {
+  background: transparent;
+}
+
+.ref[data-kind='tag']:hover {
+  background: var(--lf-hover);
+}
+
+.more {
+  height: 18px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--lf-link);
+  font-size: var(--lf-text-xs);
+  cursor: pointer;
+}
+
+.more:hover {
+  text-decoration: underline;
+}
+
+.quiet {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+  margin: 0;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+}
+
+.quiet :global(.codicon) {
+  flex: 0 0 auto;
+  font-size: 12px;
+}

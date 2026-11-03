@@ -3,6 +3,7 @@
  * process: a value of the wrong type fails here, with a plain message, instead of reaching git.
  */
 
+import { isObjectId } from '../../shared/oid';
 import { assertRevision } from '../git/args';
 import { isFilePath } from '../repo/lineStaging';
 
@@ -17,6 +18,12 @@ export function checkCount(value: unknown, max: number, fallback = max): number 
 export function checkRev(value: unknown): string {
   if (typeof value !== 'string') throw new Error(`Not a revision: ${String(value)}.`);
   return assertRevision(value);
+}
+
+/** A full object ID (a commit's hash, as git prints it). */
+export function checkObjectId(value: unknown): string {
+  if (!isObjectId(value)) throw new Error(`Not an object ID: ${String(value)}.`);
+  return value;
 }
 
 /** One of `allowed`; `fallback` when none was given. */

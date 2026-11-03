@@ -89,6 +89,42 @@ describe('RepoData and LogEngine on the demo repository', () => {
     expect(between).toHaveLength(3);
   });
 
+  it('lists the branches, remote branches and tags that contain a commit', async () => {
+    const [line] = (await demo.repo.log('feature/login', '%H %s')).filter((l) =>
+      l.includes('Validate credentials'),
+    );
+    const refs = await data.refsContaining(line!.split(' ')[0]!);
+    // Merged into main (and pushed), so in everything branched from main since; not in the
+    // hotfix or the experiment, which start before the merge.
+    expect(refs.map((ref) => ref.short).sort()).toEqual([
+      'feature/login',
+      'feature/search',
+      'main',
+      'origin/feature/search',
+      'origin/main',
+      'v1.0.0',
+    ]);
+    expect(refs.find((ref) => ref.short === 'main')).toMatchObject({ kind: 'branch', isHead: true });
+    expect(refs.find((ref) => ref.short === 'origin/main')).toMatchObject({
+      kind: 'remote',
+      remote: 'origin',
+    });
+    // Tags lead to their commit; upstreams are not read (their counts would cost a walk each).
+    expect(refs.find((ref) => ref.short === 'v1.0.0')).toMatchObject({
+      kind: 'tag',
+      target: await demo.repo.rev('v1.0.0'),
+    });
+    expect(refs.every((ref) => ref.upstream === undefined)).toBe(true);
+  });
+
+  it('lists tags the oldest first, and nothing for a commit no ref leads to', async () => {
+    const refs = await data.refsContaining(await demo.repo.rev('v0.1.0'));
+    expect(refs.filter((ref) => ref.kind === 'tag').map((ref) => ref.short)).toEqual(['v0.1.0', 'v1.0.0']);
+    const tree = await demo.repo.git('rev-parse', 'HEAD^{tree}');
+    const loose = await demo.repo.git('commit-tree', tree, '-m', 'On no branch');
+    expect(await data.refsContaining(loose)).toEqual([]);
+  });
+
   it('streams the full history and lays it out', async () => {
     const head = await repo.head();
     const query = revListArgs({ scope: { type: 'all' } }, head, 'topo');

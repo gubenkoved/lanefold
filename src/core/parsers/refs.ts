@@ -19,6 +19,22 @@ export const REFS_FORMAT = [
 export const REFS_PATTERNS = ['refs/heads', 'refs/remotes', 'refs/tags'];
 
 /**
+ * {@link REFS_FORMAT} with the upstream fields left empty: their ahead/behind counts would walk
+ * history once per branch, for nothing a list of names needs.
+ */
+export const REFS_NAMES_FORMAT = [
+  '%(refname)',
+  '%(objecttype)',
+  '%(objectname)',
+  '%(*objectname)',
+  '',
+  '',
+  '%(HEAD)',
+  '%(symref)',
+  '%(creatordate:unix)',
+].join('%00');
+
+/**
  * The fields of {@link REFS_FORMAT} that need no object read: refname, objectname, upstream,
  * track, HEAD marker, symref. The rest (type, peeled object, date) depend only on the object, so
  * they can be remembered per object ID: with tens of thousands of tags, opening every object is

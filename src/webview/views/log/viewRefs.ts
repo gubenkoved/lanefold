@@ -4,7 +4,7 @@ import { isHideableRef, type RefInfo, type ViewConfig } from '../../../shared/mo
  * Which refs a log view shows (the branches pane's checkboxes), and the view that shows one
  * more or one fewer. Every scope keeps its kind: 'all' and 'local' leave refs out with
  * `hidden`, 'head' and 'local' add refs with `extra`, and a view of chosen refs lists them.
- * Also how views name refs.
+ * Also how views and lists name and order refs.
  */
 
 /** Whether a view shows a ref (its commits); `fixed`: why that cannot change from here. */
@@ -116,4 +116,24 @@ export function viewLabel(view: ViewConfig): string {
   const extra = scope.type === 'all' ? [] : (view.extra ?? []);
   if (extra.length === 0) return label;
   return extra.length === 1 ? `${label} + ${shortRefName(extra[0]!)}` : `${label} +${extra.length}`;
+}
+
+/**
+ * Branches in the order they are looked for: the current one, the trunk, the other local
+ * branches, then remote branches (the trunk's first); each by name.
+ */
+export function orderBranches(refs: readonly RefInfo[], trunk: string | undefined): RefInfo[] {
+  const rank = (ref: RefInfo) =>
+    ref.kind === 'branch'
+      ? ref.isHead
+        ? 0
+        : ref.short === trunk
+          ? 1
+          : 2
+      : trunk && ref.short.endsWith(`/${trunk}`)
+        ? 3
+        : 4;
+  return refs
+    .filter((ref) => ref.kind !== 'tag')
+    .sort((a, b) => rank(a) - rank(b) || a.short.localeCompare(b.short));
 }

@@ -4,6 +4,7 @@ import type {
   CommitMeta,
   CompareSummary,
   HeadInfo,
+  RefInfo,
   RefsSnapshot,
   RemoteInfo,
   SearchQuery,
@@ -23,9 +24,11 @@ import {
   composeRefRecords,
   parseRefObject,
   parseRefRecords,
+  parseRefs,
   pickTrunk,
   REFS_FAST_FORMAT,
   REFS_FORMAT,
+  REFS_NAMES_FORMAT,
   REFS_PATTERNS,
   splitRefRecords,
   type RefObject,
@@ -319,6 +322,25 @@ export class RepoData {
     const diffBase = raw.parents[0];
     const files = await this.diffFiles(diffBase, sha);
     return { ...this.toMeta(sha, raw), body: bodyOf(raw.message), diffBase, files };
+  }
+
+  /**
+   * The branches, remote branches and tags whose history holds a commit, the oldest first (by
+   * the date of their commit or tag), without upstreams. git walks history for it: on a large
+   * repository it can take a while, so it runs in the background and stops when `signal` aborts.
+   */
+  async refsContaining(sha: string, signal?: AbortSignal): Promise<RefInfo[]> {
+    const { stdout } = await this.repo.git(
+      [
+        'for-each-ref',
+        `--contains=${sha}`,
+        '--sort=creatordate',
+        `--format=${REFS_NAMES_FORMAT}`,
+        ...REFS_PATTERNS,
+      ],
+      { readOnly: true, background: true, label: 'Branches containing a commit', signal },
+    );
+    return parseRefs(stdout);
   }
 
   stashList(): Promise<StashEntry[]> {

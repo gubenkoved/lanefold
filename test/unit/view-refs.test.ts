@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RefInfo, ViewConfig } from '../../src/shared/models';
-import { refShown, viewLabel, withRef } from '../../src/webview/views/log/viewRefs';
+import { orderBranches, refShown, viewLabel, withRef } from '../../src/webview/views/log/viewRefs';
 
 const sha = (n: number) => n.toString(16).padStart(40, '0');
 
@@ -119,5 +119,25 @@ describe('viewLabel', () => {
     );
     expect(viewLabel(chosen('main', 'dev'))).toBe('main, dev');
     expect(viewLabel(chosen('main', 'dev', 'v1.0'))).toBe('main +2 more');
+  });
+});
+
+describe('orderBranches', () => {
+  it('puts the current branch and the trunk first, local before remote branches', () => {
+    const refs = [
+      ref('refs/remotes/origin/zeta'),
+      ref('refs/heads/alpha'),
+      ref('refs/remotes/origin/main'),
+      ref('refs/tags/v1'),
+      ref('refs/heads/main'),
+      ref('refs/heads/topic', { isHead: true }),
+    ];
+    expect(orderBranches(refs, 'main').map((r) => r.short)).toEqual([
+      'topic',
+      'main',
+      'alpha',
+      'origin/main',
+      'origin/zeta',
+    ]);
   });
 });

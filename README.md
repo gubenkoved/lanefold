@@ -15,7 +15,7 @@ shows the git commands it will use, and every change it makes to the repository 
   file, folder and line history; comparisons between two refs; stashes, the reflog and
   statistics.
 - Details for one commit, two commits or a selection, with changed files that open in VS Code's
-  diff editor.
+  diff editor. A commit's details list the branches and tags that contain it.
 - Search by text, author (`@name`), hash (`#1a2b3c`), path (`file:`), message (`message:`) and
   date (`after:`, `before:`). Matches are highlighted, or the graph is filtered down to them.
 - Blame annotations with an age heat bar (their width and how they name authors and dates are

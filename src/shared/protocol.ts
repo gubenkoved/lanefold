@@ -10,6 +10,7 @@ import type {
   GitInfo,
   HeadInfo,
   ReflogEntry,
+  RefInfo,
   RefsSnapshot,
   RemoteInfo,
   RepoChangeKind,
@@ -175,6 +176,12 @@ export interface HostApi {
   /** Uncommitted changes as file lists. */
   'repo.worktreeChanges'(params: { repoId: string }): WorktreeChanges;
   'commit.details'(params: { repoId: string; sha: string }): CommitDetails;
+  /**
+   * The branches, remote branches and tags whose history holds a commit, the oldest first
+   * (without upstreams). git walks history for it: on a large repository it takes a while, and
+   * cancelling stops it.
+   */
+  'commit.containedIn'(params: { repoId: string; sha: string }): readonly RefInfo[];
   /** The commits as a patch (git format-patch, oldest first), for the clipboard. */
   'patch.text'(params: { repoId: string; shas: readonly string[] }): string;
   /** Saves the commits as a patch file where the person chooses; the path, or null if cancelled. */
