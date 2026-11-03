@@ -20,20 +20,106 @@ test('the branches pane reveals, filters and hides branches in the view', async 
   await expect(tree.getByRole('treeitem', { name: 'review/maps' })).toBeVisible();
   await expect(tree.getByRole('treeitem', { name: /timezone/ })).toHaveCount(0);
 
-  // Hiding both maps branches takes their own commits out of this view.
+  // Unchecking both maps branches (a click on the checkbox, Space) takes their own commits out
+  // of this view.
+  const experiment = tree.getByRole('treeitem', { name: 'experiment/maps' });
+  const review = tree.getByRole('treeitem', { name: 'review/maps' });
   await expect(graphRow(page, 'Try vector tiles')).toBeVisible();
-  for (const name of ['experiment/maps', 'review/maps']) {
-    await tree.getByRole('treeitem', { name }).hover();
-    await tree.getByRole('treeitem', { name }).getByRole('button', { name: 'Hide in this view' }).click();
-  }
+  await expect(experiment).toHaveAttribute('aria-checked', 'true');
+  await experiment.locator('[data-checked]').click();
+  await expect(experiment).toHaveAttribute('aria-checked', 'false');
+  // From the keyboard (without revealing the branch in the graph): the last row, Space.
+  await tree.focus();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Space');
+  await expect(review).toHaveAttribute('aria-checked', 'false');
   await expect(graphRow(page, 'Try vector tiles')).toBeHidden();
   await expect(graphRow(page, 'Prototype radar map layer')).toBeHidden();
   await expect(graphRow(page, 'Add dark mode toggle')).toBeVisible();
 
   // Shown again from the context menu.
-  await tree.getByRole('treeitem', { name: 'experiment/maps' }).click({ button: 'right' });
+  await experiment.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Show in this view' }).click();
   await expect(graphRow(page, 'Try vector tiles')).toBeVisible();
+  await expect(experiment).toHaveAttribute('aria-checked', 'true');
+});
+
+test('checkboxes add branches to the current branch, and to a view of one branch', async ({ page }) => {
+  await page.goto(harnessUrl());
+  await page.getByRole('tab', { name: 'main' }).click();
+  const panel = page.getByRole('tabpanel', { name: 'main' });
+  const pane = panel.getByRole('complementary', { name: 'Branches' });
+  const tree = pane.getByRole('tree');
+  const filter = pane.getByRole('textbox', { name: 'Filter branches and tags' });
+  // The local branch comes first (its remote branch has the same name under origin); a row's
+  // name goes on with its buttons while it has focus.
+  const item = (name: string) => tree.getByRole('treeitem', { name: new RegExp(`^${name}`) }).first();
+  const scope = panel.locator('button[title^="Branches this view shows"]');
+  await expect(graphRow(page, 'Add dark mode toggle')).toBeVisible();
+  await expect(graphRow(page, 'Show recent searches')).toBeHidden();
+  // The branch checked out (one commit ahead of origin/main).
+  await expect(item('main')).toHaveAttribute('aria-checked', 'true');
+
+  // Checking a branch adds its commits; the view stays the current branch's.
+  await filter.fill('search');
+  await expect(item('feature/search')).toHaveAttribute('aria-checked', 'false');
+  await item('feature/search').locator('[data-checked]').click();
+  await expect(item('feature/search')).toHaveAttribute('aria-checked', 'true');
+  await expect(graphRow(page, 'Show recent searches')).toBeVisible();
+  await expect(graphRow(page, 'Add dark mode toggle')).toBeVisible();
+  await expect(scope).toContainText('Current branch + feature/search');
+
+  // Choosing a branch the view does not show offers to show it here.
+  await filter.fill('maps');
+  await item('experiment/maps').click();
+  await page.getByRole('button', { name: 'Show it here' }).click();
+  await expect(item('experiment/maps')).toHaveAttribute('aria-checked', 'true');
+  await expect(graphRow(page, 'Try vector tiles')).toBeVisible();
+  await expect(scope).toContainText('Current branch +2');
+
+  // A view of one branch (its own tab) takes more next to it; its last one stays.
+  await filter.fill('maps');
+  await item('experiment/maps').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Show only this branch' }).click();
+  const maps = page.getByRole('tabpanel', { name: 'experiment/maps' });
+  const mapsPane = maps.getByRole('complementary', { name: 'Branches' });
+  const mapsItem = (name: string) =>
+    mapsPane
+      .getByRole('tree')
+      .getByRole('treeitem', { name: new RegExp(`^${name}`) })
+      .first();
+  await expect(graphRow(page, 'Try vector tiles')).toBeVisible();
+  await expect(graphRow(page, 'Add dark mode toggle')).toBeHidden();
+  const mapsFilter = mapsPane.getByRole('textbox', { name: 'Filter branches and tags' });
+  const mapsScope = maps.locator('button[title^="Branches this view shows"]');
+  await mapsFilter.fill('search');
+  await mapsItem('feature/search').locator('[data-checked]').click();
+  await expect(mapsScope).toContainText('experiment/maps, feature/search');
+  await expect(graphRow(page, 'Show recent searches')).toBeVisible();
+  await mapsItem('feature/search').locator('[data-checked]').click();
+  await expect(mapsScope).toContainText('experiment/maps');
+  await expect(graphRow(page, 'Show recent searches')).toBeHidden();
+  await mapsFilter.fill('maps');
+  await expect(mapsItem('experiment/maps').locator('[data-checked]')).toHaveAttribute('data-fixed', 'true');
+});
+
+test('"New view" shows several branches together', async ({ page }) => {
+  await page.goto(harnessUrl());
+  await page.getByRole('button', { name: 'New view' }).click();
+  await page.getByRole('menuitem', { name: /Several branches/ }).click();
+  const picker = page.getByRole('dialog', { name: 'Branches to show' });
+  for (const name of ['feature/search', 'experiment/maps']) {
+    await picker.getByRole('combobox').fill(name);
+    await picker
+      .getByRole('option', { name: new RegExp(`^${name}`) })
+      .first()
+      .click();
+  }
+  await picker.getByRole('button', { name: 'Show' }).click();
+  await expect(page.getByRole('tab', { name: 'feature/search +1' })).toHaveAttribute('aria-selected', 'true');
+  await expect(graphRow(page, 'Show recent searches')).toBeVisible();
+  await expect(graphRow(page, 'Try vector tiles')).toBeVisible();
+  await expect(graphRow(page, 'Add dark mode toggle')).toBeHidden();
 });
 
 test('favorites collect at the top of the pane', async ({ page }) => {

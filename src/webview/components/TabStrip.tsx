@@ -2,9 +2,9 @@ import { motion, Reorder } from 'motion/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { RefScope } from '../../shared/models';
 import { hostRpc, showStashes, useApp } from '../state/store';
-import { CONSOLE_TAB_ID, HEAD_TITLE, plainLogTab, tabTitles, type TabModel } from '../state/tabs';
+import { CONSOLE_TAB_ID, HEAD_TITLE, plainLogTab, scopeTitle, tabTitles, type TabModel } from '../state/tabs';
 import { focusWhenShown } from '../state/viewFocus';
-import { customRevision, refPickerItems } from '../views/refItems';
+import { customRefOrPattern, customRevision, refPickerItems } from '../views/refItems';
 import { openReposTab, REPOS_ICON } from '../views/repos/reposTab';
 import { openStats, STATS_ICON } from '../views/stats/statsTab';
 import { Icon } from './Icon';
@@ -204,6 +204,33 @@ export function TabStrip() {
                 items: refPickerItems(refs, { includeHead: true }),
                 custom: customRevision,
                 onPick: ([ref]) => ref && showScope(ref, { type: 'refs', refs: [ref] }),
+              }),
+            );
+        },
+      },
+      {
+        id: 'branches',
+        label: 'Several branches…',
+        icon: 'checklist',
+        hint: 'git log <ref> <ref>…',
+        onSelect: () => {
+          const repoId = useApp.getState().activeRepoId;
+          if (!repoId) return;
+          void hostRpc()
+            .call('repo.refs', { repoId })
+            .then((refs) =>
+              openPicker(anchor, {
+                title: 'Branches to show',
+                placeholder: 'Filter branches and tags, or type a glob (feature/*)',
+                items: refPickerItems(refs, { includeHead: true }),
+                multi: true,
+                custom: customRefOrPattern,
+                applyLabel: 'Show',
+                onPick: (chosen) => {
+                  if (chosen.length === 0) return;
+                  const scope = { type: 'refs', refs: chosen } as const;
+                  showScope(scopeTitle(scope), scope);
+                },
               }),
             );
         },

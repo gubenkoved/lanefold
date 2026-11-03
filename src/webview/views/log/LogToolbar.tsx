@@ -7,39 +7,15 @@ import { openPicker } from '../../components/Picker';
 import { SCOPE_ICONS } from '../../components/TabStrip';
 import type { LogModel } from '../../graph/logModel';
 import { useApp } from '../../state/store';
-import type { TabModel } from '../../state/tabs';
-import { refPickerItems } from '../refItems';
+import { scopeTitle, type TabModel } from '../../state/tabs';
+import { customRefOrPattern, refPickerItems } from '../refItems';
 import { useModelVersion } from './parts';
 import type { SearchMatches } from './useLogSearch';
+import { shortRefName, viewLabel } from './viewRefs';
 import styles from './LogToolbar.module.css';
 
 export function scopeLabel(scope: RefScope): string {
-  switch (scope.type) {
-    case 'all':
-      return 'All branches';
-    case 'head':
-      return 'Current branch';
-    case 'local':
-      return 'Local branches';
-    case 'refs':
-      return scope.refs.length <= 2
-        ? scope.refs.join(', ')
-        : `${scope.refs[0]} +${scope.refs.length - 1} more`;
-  }
-}
-
-/** Default tab title for a scope (used until the user renames the tab). */
-export function scopeTitle(scope: RefScope): string {
-  switch (scope.type) {
-    case 'all':
-      return 'All';
-    case 'head':
-      return 'HEAD';
-    case 'local':
-      return 'Local';
-    case 'refs':
-      return scope.refs.length === 1 ? scope.refs[0]! : `${scope.refs[0]} +${scope.refs.length - 1}`;
-  }
+  return viewLabel({ scope });
 }
 
 /** Applies a view change to a tab, retitling it when it still has its automatic title. */
@@ -284,7 +260,15 @@ export function LogToolbar({
   const view = tab.view!;
 
   const scopeMenu = (anchor: Element) => {
-    const setScope = (scope: RefScope) => updateView(tab, { ...view, scope });
+    // Refs added to a view belong to its old scope (choosing that again resets it).
+    const setScope = (scope: RefScope) => updateView(tab, { ...view, scope, extra: undefined });
+    // What the view shows now, as the picker names refs.
+    const chosen =
+      view.scope.type === 'refs'
+        ? view.scope.refs
+        : view.scope.type === 'head'
+          ? ['HEAD', ...(view.extra ?? []).map(shortRefName)]
+          : [];
     const entries: MenuEntry[] = [
       { kind: 'header', label: 'Show commits from' },
       {
@@ -324,16 +308,8 @@ export function LogToolbar({
             placeholder: 'Filter branches and tags, or type a glob (feature/*)',
             items: refPickerItems(source.refs, { includeHead: true }),
             multi: true,
-            selected: view.scope.type === 'refs' ? view.scope.refs : [],
-            custom: (text) =>
-              /^[^\s-][^\s]*$/.test(text)
-                ? {
-                    value: text,
-                    label: text,
-                    description: text.includes('*') ? 'pattern' : 'revision',
-                    icon: 'symbol-key',
-                  }
-                : undefined,
+            selected: chosen,
+            custom: customRefOrPattern,
             applyLabel: 'Show',
             onPick: (refs) => refs.length > 0 && setScope({ type: 'refs', refs }),
           });
@@ -434,10 +410,10 @@ export function LogToolbar({
         type="button"
         className={styles.chip}
         onClick={(event) => scopeMenu(event.currentTarget)}
-        title={`Branches this view shows: ${scopeLabel(view.scope)}`}
+        title={`Branches this view shows: ${viewLabel(view)}`}
       >
         <Icon name={SCOPE_ICONS[view.scope.type]} />
-        <span className={styles.chipLabel}>{scopeLabel(view.scope)}</span>
+        <span className={styles.chipLabel}>{viewLabel(view)}</span>
         <Icon name="chevron-down" className={styles.chevron} />
       </button>
       <LimitChip tab={tab} />

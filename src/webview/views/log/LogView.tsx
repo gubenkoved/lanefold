@@ -18,7 +18,7 @@ import { HistoryEditor } from '../rewrite/HistoryEditor';
 import { BranchesPane } from './BranchesPane';
 import { DetailsPane } from './DetailsPane';
 import { HoverCard, type HoverTarget } from './HoverCard';
-import { LogToolbar } from './LogToolbar';
+import { LogToolbar, updateView } from './LogToolbar';
 import {
   openCommitChanges,
   openCompareTab,
@@ -33,6 +33,7 @@ import { copyWithToast, useCommitColor } from './parts';
 import { editBlocker } from './reach';
 import { useLogModel } from './useLogModel';
 import { useFilteredModel, useLogSearch, type SearchMatches } from './useLogSearch';
+import { refShown, withRef } from './viewRefs';
 import styles from './LogView.module.css';
 
 /** Width below which the details pane moves under the graph (or list, in other views). */
@@ -409,13 +410,21 @@ export function LogView({ tab, repoId, active }: LogViewProps) {
                 model={source}
                 selection={selection}
                 onReveal={(ref) => {
-                  if (!graphRef.current?.goTo(ref.target))
-                    toast(`${ref.short} is not in this view`, {
-                      detail: (tab.view?.hidden ?? []).includes(ref.name)
-                        ? 'It is hidden here.'
-                        : 'Its commits are not part of what this view shows.',
-                      action: { label: 'Show its history', run: () => openHistoryTab(ref.short) },
-                    });
+                  if (graphRef.current?.goTo(ref.target)) return;
+                  const history = { label: 'Show its history', run: () => openHistoryTab(ref.short) };
+                  // Unchecked here: the view can take it in.
+                  const shown = refShown(view, ref);
+                  const here =
+                    shown.shown || shown.fixed
+                      ? undefined
+                      : withRef(view, ref, true, source?.refs.refs ?? []);
+                  toast(`${ref.short} is not in this view`, {
+                    detail: here
+                      ? 'This view does not show it.'
+                      : 'Its commits are not part of what this view shows.',
+                    action: here ? { label: 'Show it here', run: () => updateView(tab, here) } : history,
+                    secondary: here ? history : undefined,
+                  });
                 }}
                 onMenu={(ref, event, extra) => {
                   setHover(undefined);

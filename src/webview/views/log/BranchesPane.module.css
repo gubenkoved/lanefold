@@ -119,6 +119,39 @@
   font-size: 12px;
 }
 
+/* Whether the view shows the ref: VS Code's checkbox, small, before the ref's icon. */
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--vscode-checkbox-border, var(--lf-hairline));
+  border-radius: 3px;
+  background: var(--vscode-checkbox-background, var(--lf-input-bg));
+  color: var(--vscode-checkbox-foreground, var(--lf-fg));
+  cursor: pointer;
+}
+
+.check :global(.codicon) {
+  font-size: 12px;
+}
+
+.check:hover {
+  border-color: var(--vscode-checkbox-selectBorder, var(--lf-focus));
+}
+
+/* It cannot change here (the branch checked out, the last one of a view): its tooltip says why. */
+.check[data-fixed='true'] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.check[data-fixed='true']:hover {
+  border-color: var(--vscode-checkbox-border, var(--lf-hairline));
+}
+
 .folderIcon,
 .refIcon {
   flex: 0 0 auto;
@@ -210,7 +243,7 @@
   color: var(--lf-accent);
 }
 
-/* A favorite's star and a hidden branch's eye stay visible. */
+/* A favorite's star stays visible. */
 .row:not(:hover):not([data-focused='true']) .rowActions:has([data-on='true']) {
   display: inline-flex;
 }

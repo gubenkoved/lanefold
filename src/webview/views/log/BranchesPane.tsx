@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
-import { isHideableRef, type RefInfo, type WorktreeInfo } from '../../../shared/models';
+import type { RefInfo, ViewConfig, WorktreeInfo } from '../../../shared/models';
 import { relativeLong } from '../../../shared/time';
 import { Icon } from '../../components/Icon';
 import { openMenu, type MenuEntry } from '../../components/Menu';
@@ -9,13 +9,14 @@ import { toggleFavorite, useFavoriteRefs } from '../../state/favorites';
 import { runOperation } from '../../state/operations';
 import { useQuery, useRepoVersion } from '../../state/queries';
 import { addRemote, useRemotes } from '../../state/remotes';
-import { useApp } from '../../state/store';
 import type { TabModel } from '../../state/tabs';
+import { updateView } from './LogToolbar';
 import { copyWithToast, useCommitColor, useModelVersion } from './parts';
 import { deleteGoneEntries, fetchRemote, removeRemote, renameRemote, showRemoteMenu } from './remoteMenu';
 import { openLinkedRepository } from './submodules';
 import { SubmodulesSection } from './SubmodulesSection';
 import { remoteOfName } from './upstreams';
+import { refShown, withRef, type RefShown } from './viewRefs';
 import styles from './BranchesPane.module.css';
 
 /** Refs listed per section before "N more" (a filter finds the rest). */
@@ -219,13 +220,13 @@ function RefRow({
   focused,
   current,
   selected,
+  shown,
   hidden,
   favorite,
-  canHide,
   elsewhere,
   onClick,
   onMenu,
-  onToggleHidden,
+  onToggleShown,
   onToggleFavorite,
 }: {
   row: Extract<Row, { type: 'ref' }>;
@@ -233,14 +234,16 @@ function RefRow({
   focused: boolean;
   current: boolean;
   selected: boolean;
+  /** Whether the view shows the ref (its checkbox). */
+  shown: RefShown;
+  /** Left out of an all-branches or local view. */
   hidden: boolean;
   favorite: boolean;
-  canHide: boolean;
   /** Checked out in another worktree (its folder). */
   elsewhere?: string;
   onClick: () => void;
   onMenu: (event: MouseEvent<HTMLElement>) => void;
-  onToggleHidden: () => void;
+  onToggleShown: () => void;
   onToggleFavorite: () => void;
 }) {
   const { ref } = row;
@@ -253,6 +256,7 @@ function RefRow({
       role="treeitem"
       aria-level={row.depth + 1}
       aria-selected={selected}
+      aria-checked={shown.shown}
       aria-current={current || undefined}
       className={styles.row}
       data-focused={focused}
@@ -274,6 +278,24 @@ function RefRow({
         onMenu(event);
       }}
     >
+      {/* A pointer shortcut: Space toggles it from the keyboard, and the row says checked or not. */}
+      <span
+        className={styles.check}
+        aria-hidden="true"
+        data-checked={shown.shown}
+        data-fixed={!!shown.fixed}
+        title={
+          shown.fixed ??
+          (shown.shown ? 'Shown in this view: click to hide it' : 'Click to show it in this view')
+        }
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!shown.fixed) onToggleShown();
+        }}
+        onDoubleClick={(event) => event.stopPropagation()}
+      >
+        {shown.shown ? <Icon name="check" /> : null}
+      </span>
       <Icon name={icon} className={styles.refIcon} style={color && !hidden ? { color } : undefined} />
       <span className={styles.name}>{row.label}</span>
       {elsewhere ? (
@@ -305,22 +327,6 @@ function RefRow({
         >
           <Icon name={favorite ? 'star-full' : 'star-empty'} />
         </button>
-        {canHide ? (
-          <button
-            type="button"
-            className={styles.rowAction}
-            data-on={hidden}
-            tabIndex={-1}
-            aria-label={hidden ? 'Show in this view' : 'Hide in this view'}
-            title={hidden ? 'Show in this view' : 'Hide in this view (its own commits too)'}
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleHidden();
-            }}
-          >
-            <Icon name={hidden ? 'eye-closed' : 'eye'} />
-          </button>
-        ) : null}
       </span>
     </div>
   );
@@ -411,7 +417,6 @@ export function BranchesPane({ repoId, tab, model, selection, onReveal, onMenu }
   const treeRef = useRef<HTMLDivElement>(null);
 
   const hidden = useMemo(() => new Set(view.hidden), [view.hidden]);
-  const scopeAllowsHiding = view.scope.type === 'all' || view.scope.type === 'local';
   const selected = useMemo(() => new Set(selection), [selection]);
 
   const sections = useMemo<Section[]>(() => {
@@ -528,20 +533,13 @@ export function BranchesPane({ repoId, tab, model, selection, onReveal, onMenu }
     saveCollapsed(next);
   };
 
-  const toggleHidden = (ref: RefInfo) => {
-    const next = new Set(hidden);
-    if (next.has(ref.name)) next.delete(ref.name);
-    else next.add(ref.name);
-    useApp.getState().updateTab(tab.id, { view: { ...view, hidden: [...next].sort() } });
+  const setView = (next: ViewConfig) => {
+    if (next !== view) updateView(tab, next);
   };
-
-  const canHide = (ref: RefInfo) =>
-    scopeAllowsHiding &&
-    isHideableRef(ref.name) &&
-    !ref.isHead &&
-    (view.scope.type === 'all' || ref.kind === 'branch');
+  const toggleShown = (ref: RefInfo) => setView(withRef(view, ref, !refShown(view, ref).shown, refs));
 
   const extraEntries = (ref: RefInfo): MenuEntry[] => {
+    const shown = refShown(view, ref);
     const entries: MenuEntry[] = [
       {
         id: 'favorite',
@@ -549,14 +547,16 @@ export function BranchesPane({ repoId, tab, model, selection, onReveal, onMenu }
         icon: favorites.includes(ref.name) ? 'star-empty' : 'star-full',
         onSelect: () => toggleFavorite(repoId, ref.name),
       },
+      {
+        id: 'shown',
+        label: shown.shown ? 'Hide in this view' : 'Show in this view',
+        icon: shown.shown ? 'eye-closed' : 'eye',
+        shortcut: 'Space',
+        disabled: !!shown.fixed,
+        reason: shown.fixed,
+        onSelect: () => toggleShown(ref),
+      },
     ];
-    if (canHide(ref))
-      entries.push({
-        id: 'hide',
-        label: hidden.has(ref.name) ? 'Show in this view' : 'Hide in this view',
-        icon: hidden.has(ref.name) ? 'eye' : 'eye-closed',
-        onSelect: () => toggleHidden(ref),
-      });
     return entries;
   };
 
@@ -596,6 +596,8 @@ export function BranchesPane({ repoId, tab, model, selection, onReveal, onMenu }
           }
         }
       }
+    } else if (event.key === ' ' && row.type === 'ref') {
+      if (!refShown(view, row.ref).fixed) toggleShown(row.ref);
     } else if (event.key === 'Enter' || event.key === ' ') {
       if (row.type === 'ref') onReveal(row.ref);
       else if (row.type === 'unfetched') fetchRemote(row.remote);
@@ -696,9 +698,9 @@ export function BranchesPane({ repoId, tab, model, selection, onReveal, onMenu }
                 focused={index === focusIndex && focus !== undefined}
                 current={!!row.ref.isHead && row.ref.short === head?.branch}
                 selected={selected.has(row.ref.target)}
+                shown={refShown(view, row.ref)}
                 hidden={hidden.has(row.ref.name)}
                 favorite={favorites.includes(row.ref.name)}
-                canHide={canHide(row.ref)}
                 elsewhere={row.ref.kind === 'branch' ? checkedOutElsewhere.get(row.ref.short) : undefined}
                 onClick={() => {
                   setFocus(row.id);
@@ -708,7 +710,10 @@ export function BranchesPane({ repoId, tab, model, selection, onReveal, onMenu }
                   setFocus(row.id);
                   onMenu(row.ref, event, extraEntries(row.ref));
                 }}
-                onToggleHidden={() => toggleHidden(row.ref)}
+                onToggleShown={() => {
+                  setFocus(row.id);
+                  toggleShown(row.ref);
+                }}
                 onToggleFavorite={() => toggleFavorite(repoId, row.ref.name)}
               />
             );

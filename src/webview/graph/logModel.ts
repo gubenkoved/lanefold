@@ -544,9 +544,12 @@ export class LogModel {
     if (!this.partial || this.phase !== 'ready') return [];
     const scope = this.view.scope.type;
     const hidden = new Set(this.view.hidden);
+    const extra = new Set(this.view.extra);
     return this.refs.refs.filter(
       (ref) =>
-        (scope === 'all' || ref.kind === 'branch') && !hidden.has(ref.name) && !this.tipRows.has(ref.target),
+        (scope === 'all' || ref.kind === 'branch' || extra.has(ref.name)) &&
+        !hidden.has(ref.name) &&
+        !this.tipRows.has(ref.target),
     );
   }
 

@@ -1,4 +1,5 @@
 import {
+  isHideableRef,
   isLineRange,
   parseRefScope,
   type DefaultTabTemplate,
@@ -66,6 +67,20 @@ export function defaultTabs(templates: readonly DefaultTabTemplate[]): TabsState
 /** The automatic title of a current-branch view (what the scope is called until renamed). */
 export const HEAD_TITLE = 'HEAD';
 
+/** Default tab title for a scope (used until the user renames the tab). */
+export function scopeTitle(scope: RefScope): string {
+  switch (scope.type) {
+    case 'all':
+      return 'All';
+    case 'head':
+      return HEAD_TITLE;
+    case 'local':
+      return 'Local';
+    case 'refs':
+      return scope.refs.length === 1 ? scope.refs[0]! : `${scope.refs[0]} +${scope.refs.length - 1}`;
+  }
+}
+
 /**
  * What a tab is called on screen: a current-branch view still titled automatically is named
  * after the branch checked out ("HEAD" while detached), every other tab after its title.
@@ -111,6 +126,7 @@ export function plainLogTab(tabs: readonly TabModel[], scope: RefScope): TabMode
       !!tab.view &&
       sameScope(tab.view.scope, scope) &&
       !tab.view.hidden?.length &&
+      !tab.view.extra?.length &&
       !tab.view.paths?.length &&
       !tab.view.lines &&
       !tab.search,
@@ -134,8 +150,14 @@ function isStringArray(value: unknown): value is string[] {
 
 function validView(view: unknown): view is ViewConfig {
   if (!view || typeof view !== 'object') return false;
-  const { hidden, paths, lines } = view as { hidden?: unknown; paths?: unknown; lines?: unknown };
+  const { hidden, extra, paths, lines } = view as {
+    hidden?: unknown;
+    extra?: unknown;
+    paths?: unknown;
+    lines?: unknown;
+  };
   if (hidden !== undefined && !isStringArray(hidden)) return false;
+  if (extra !== undefined && !(isStringArray(extra) && extra.every(isHideableRef))) return false;
   if (paths !== undefined && !isStringArray(paths)) return false;
   if (lines !== undefined && !isLineRange(lines)) return false;
   const scope = (view as ViewConfig).scope as unknown;

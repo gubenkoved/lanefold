@@ -91,8 +91,10 @@ const PRELOAD_MAX_TIPS = 64;
 export function preloadTips(view: ViewConfig, refs: RefsSnapshot): string[] | undefined {
   if ((view.scope.type !== 'all' && view.scope.type !== 'local') || view.lines) return undefined;
   const hidden = new Set(view.hidden);
+  const extra = new Set(view.extra);
   const candidates = refs.refs.filter(
-    (ref) => (view.scope.type === 'all' || ref.kind === 'branch') && !hidden.has(ref.name),
+    (ref) =>
+      (view.scope.type === 'all' || ref.kind === 'branch' || extra.has(ref.name)) && !hidden.has(ref.name),
   );
   if (candidates.length < 2 || candidates.some((ref) => ref.date === undefined)) return undefined;
   const newest = Math.max(...candidates.map((ref) => ref.date!));
@@ -130,6 +132,11 @@ export function searchArgs(
   return variants;
 }
 
+/** The refs a 'head' or 'local' view shows besides its own (full names, never options). */
+function extraRefs(view: ViewConfig): string[] {
+  return (view.extra ?? []).filter(isHideableRef);
+}
+
 /** `--exclude` options for the hidden refs under `prefix` (they apply to the next --branches etc.). */
 function excludes(view: ViewConfig, prefix: string): string[] {
   return (view.hidden ?? [])
@@ -157,10 +164,12 @@ function scopeArgs(view: ViewConfig, head: HeadInfo): string[] | undefined {
     case 'local':
       args.push(...excludes(view, 'refs/heads/'), '--branches');
       if (!head.unborn) revisions.push('HEAD');
+      revisions.push(...extraRefs(view));
       break;
     case 'head':
-      if (head.unborn) return undefined;
-      revisions.push('HEAD');
+      if (!head.unborn) revisions.push('HEAD');
+      revisions.push(...extraRefs(view));
+      if (revisions.length === 0) return undefined;
       break;
     case 'refs':
       for (const ref of scope.refs) {

@@ -40,6 +40,17 @@ export function refPickerItems(
   return items;
 }
 
+/** Lets a picker of refs to show accept a typed glob ("feature/*") or other revision. */
+export function customRefOrPattern(text: string): PickerItem | undefined {
+  if (!/^[^\s-][^\s]*$/.test(text)) return undefined;
+  return {
+    value: text,
+    label: text,
+    description: text.includes('*') ? 'pattern' : 'revision',
+    icon: 'symbol-key',
+  };
+}
+
 /** Lets the picker accept a typed commit hash or other revision ("HEAD~3", "v1.0^{}"). */
 export function customRevision(text: string): PickerItem | undefined {
   if (text.startsWith('-') || /\s/.test(text)) return undefined;

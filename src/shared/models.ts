@@ -345,6 +345,11 @@ export interface ViewConfig {
    * reach.
    */
   readonly hidden?: readonly string[];
+  /**
+   * Refs (full names) shown besides a 'head' or 'local' view's own: the current branch and
+   * `main`, say, or the local branches and a remote branch.
+   */
+  readonly extra?: readonly string[];
   /** Line history: the commits that changed these lines of a file, followed back through edits (`git log -L`). */
   readonly lines?: LineRange;
 }

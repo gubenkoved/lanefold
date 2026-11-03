@@ -121,6 +121,57 @@ describe('hidden refs', () => {
   });
 });
 
+describe('refs shown besides a view’s own', () => {
+  const head = { branch: 'main', sha: sha(1), detached: false, unborn: false };
+
+  it('adds them to the current branch and to the local branches', () => {
+    const extra = ['refs/heads/main', 'refs/remotes/origin/feature', 'refs/tags/v1.0'];
+    expect(revListArgs({ scope: { type: 'head' }, extra }, head, 'topo').args).toEqual([
+      'rev-list',
+      '--parents',
+      '--topo-order',
+      '--end-of-options',
+      'HEAD',
+      ...extra,
+    ]);
+    expect(
+      revListArgs({ scope: { type: 'local' }, hidden: ['refs/heads/wip'], extra }, head, 'topo').args,
+    ).toEqual([
+      'rev-list',
+      '--parents',
+      '--topo-order',
+      '--exclude=wip',
+      '--branches',
+      '--end-of-options',
+      'HEAD',
+      ...extra,
+    ]);
+  });
+
+  it('shows them without a first commit of its own, and takes ref names only', () => {
+    const unborn = { branch: 'main', detached: false, unborn: true };
+    expect(revListArgs({ scope: { type: 'head' } }, unborn, 'topo').args).toBeUndefined();
+    expect(
+      revListArgs({ scope: { type: 'head' }, extra: ['refs/heads/other'] }, unborn, 'topo').args,
+    ).toEqual(['rev-list', '--parents', '--topo-order', '--end-of-options', 'refs/heads/other']);
+    expect(
+      revListArgs({ scope: { type: 'head' }, extra: ['--all', 'HEAD~2', 'refs/heads/a*'] }, head, 'topo')
+        .args,
+    ).toEqual(['rev-list', '--parents', '--topo-order', '--end-of-options', 'HEAD']);
+  });
+
+  it('counts them in the fast first load of local branches', () => {
+    const refs = snapshot([
+      { name: 'refs/heads/new', target: sha(2), date: NOW },
+      { name: 'refs/heads/old', target: sha(3), date: NOW - 900 * DAY },
+      { name: 'refs/remotes/origin/new', kind: 'remote', target: sha(4), date: NOW },
+      { name: 'refs/tags/v0.1', kind: 'tag', target: sha(5), date: NOW },
+    ]);
+    const tips = preloadTips({ scope: { type: 'local' }, extra: ['refs/remotes/origin/new'] }, refs);
+    expect(tips?.sort()).toEqual([sha(1), sha(2), sha(4)].sort());
+  });
+});
+
 describe('line history', () => {
   const head = { branch: 'main', sha: sha(1), detached: false, unborn: false };
 

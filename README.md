@@ -11,8 +11,9 @@ shows the git commands it will use, and every change it makes to the repository 
 ### History
 
 - A commit graph that streams history from git and stays responsive with millions of commits.
-- Views as tabs: all branches, the current branch, local branches or a single ref; file, folder
-  and line history; comparisons between two refs; stashes, the reflog and statistics.
+- Views as tabs: all branches, the current branch, local branches or the branches you choose;
+  file, folder and line history; comparisons between two refs; stashes, the reflog and
+  statistics.
 - Details for one commit, two commits or a selection, with changed files that open in VS Code's
   diff editor.
 - Search by text, author (`@name`), hash (`#1a2b3c`), path (`file:`), message (`message:`) and
@@ -52,7 +53,9 @@ shows the git commands it will use, and every change it makes to the repository 
 
 ### Branches and remotes
 
-- A branches pane with folders, remotes, tags, favorites and ahead/behind counts.
+- A branches pane with folders, remotes, tags, favorites and ahead/behind counts. Its checkboxes
+  choose what the view shows: branches left out, or added to the current branch or to the ones
+  chosen.
 - Fetch, pull and push, with results in plain words. Force pushes, and deleting or renaming
   branches on a remote, always use `--force-with-lease`.
 - Delete branches locally, from their remote, or both at once; rename a branch here and on its
@@ -98,6 +101,7 @@ on macOS) or run **Lanefold: Open** from the Command Palette. Every command is u
 | Graph          | <kbd>↑</kbd> <kbd>↓</kbd> select, <kbd>←</kbd> <kbd>→</kbd> go to a child or the parent, <kbd>Enter</kbd> open the changes, <kbd>Shift</kbd>+<kbd>F10</kbd> menu, <kbd>F2</kbd> reword                                           |
 | Graph          | <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> search, <kbd>F3</kbd> next match, <kbd>Ctrl</kbd>+<kbd>C</kbd> copy hashes, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redo                   |
 | History editor | <kbd>P</kbd> pick, <kbd>R</kbd> reword, <kbd>E</kbd> edit, <kbd>I</kbd> split, <kbd>S</kbd> squash, <kbd>F</kbd> fixup, <kbd>D</kbd> drop, <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> apply |
+| Branches       | <kbd>Space</kbd> show or hide in the view, <kbd>Enter</kbd> go to the commit, <kbd>F2</kbd> rename, <kbd>Delete</kbd> delete                                                                                                     |
 | Tabs           | <kbd>Alt</kbd>+<kbd>←</kbd> <kbd>→</kbd> move, <kbd>F2</kbd> rename, <kbd>Delete</kbd> close                                                                                                                                     |
 | Blame          | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>[</kbd> annotate the previous revision, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>,</kbd> back, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>.</kbd> forward                                                |
 
