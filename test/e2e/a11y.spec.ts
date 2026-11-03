@@ -16,6 +16,8 @@ const THEMES = ['dark-modern', 'light-modern', 'dark-hc', 'light-hc'];
 
 // Reduced motion: moves and resizes are instant and CSS fades shorter, so audits wait less for them.
 test.use({ reducedMotion: 'reduce' });
+// A test runs several axe audits, and on a busy machine one alone can take 5 seconds.
+test.describe.configure({ timeout: 90_000 });
 
 /** A second, small repository next to a copy of the demo one. */
 function secondRepository(next: string): string {
@@ -122,7 +124,8 @@ for (const theme of THEMES) {
       await expect(page.getByRole('menu')).toBeVisible();
       await audit(page, 'commit menu');
       await page.getByRole('menuitem', { name: /New branch/ }).click();
-      await expect(page.getByRole('dialog')).toBeVisible();
+      // A sheet is dimmed until its plan comes (slow under load): audited once the plan names it.
+      await expect(page.getByRole('dialog', { name: 'Create a branch' })).toBeVisible();
       await audit(page, 'review sheet with a form');
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog')).toBeHidden();
@@ -132,7 +135,7 @@ for (const theme of THEMES) {
       await audit(page, 'remote menu');
       await page.keyboard.press('Escape');
       await tree.getByRole('treeitem', { name: 'Add remote…' }).click();
-      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByRole('dialog', { name: 'Add a remote' })).toBeVisible();
       await audit(page, 'add remote sheet');
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog')).toBeHidden();
