@@ -92,6 +92,11 @@ test('while the editor is open, git’s Undo waits: Ctrl+Z steps back the arrang
   const head = git(repo, 'rev-parse', 'HEAD');
   const undo = page.getByRole('button', { name: /^Undo: Edit history of main/ });
   await expect(undo).toBeEnabled();
+  // Let the graph's reload settle before using its menus (a right-click on a row that moves lands
+  // on another commit). It shows main's new history first, as main alone has recent commits, then
+  // the other branches' too: origin/main's “Improve README” is back.
+  await expect(graphRow(page, 'Add dark mode toggle')).toContainText(head.slice(0, 8));
+  await expect(graphRow(page, 'Improve README')).toBeVisible();
 
   // Editing again (the graph shows the new history): the top bar's Undo waits for the edit to be
   // applied or cancelled.

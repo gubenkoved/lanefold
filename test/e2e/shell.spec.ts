@@ -107,6 +107,8 @@ test('pickers work from the keyboard: typing filters, Enter chooses, Escape give
 
 test('a comparison is set up from the keyboard', async ({ page }) => {
   await page.goto(harnessUrl());
+  // A comparison starts from the current branch (from HEAD while that is not known yet).
+  await expect(page.getByRole('button', { name: /aurora/ })).toContainText('main');
   await page.getByRole('button', { name: 'New view' }).click();
   await page.getByRole('menuitem', { name: /Compare branches/ }).click();
 
