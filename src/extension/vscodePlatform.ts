@@ -4,6 +4,7 @@ import type { Platform, PlatformDiff, PlatformMerge, PlatformMultiDiff } from '.
 import type { Repository } from '../core/repo/repository';
 import type { Disposable } from '../core/util/emitter';
 import { paths } from '../core/util/paths';
+import { readLinkSettings } from '../shared/codeHosts';
 import { DEFAULT_SETTINGS, type Settings } from '../shared/models';
 import type { HostCommand } from '../shared/protocol';
 import { emptyUri, revisionUri } from './revisionFs';
@@ -20,6 +21,7 @@ export function readSettings(): Settings {
     dateFormat: config.get('dateFormat', DEFAULT_SETTINGS.dateFormat),
     gravatar: config.get('avatars.gravatar', DEFAULT_SETTINGS.gravatar),
     defaultTabs: config.get('views.defaultTabs', DEFAULT_SETTINGS.defaultTabs),
+    links: readLinkSettings(config.get('links.hosts'), config.get('links.autolinks')),
   };
 }
 
@@ -131,6 +133,10 @@ export class VscodePlatform implements Platform {
         openLabel: 'Choose',
       })) ?? [];
     return picked?.fsPath;
+  }
+
+  async openExternal(url: string): Promise<void> {
+    await vscode.env.openExternal(vscode.Uri.parse(url, true));
   }
 
   getSettings(): Settings {

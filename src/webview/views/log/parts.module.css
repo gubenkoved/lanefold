@@ -269,3 +269,18 @@
 .error {
   color: var(--lf-error);
 }
+
+/* Links in commit messages: the text's own color, dotted underneath, until pointed at. */
+.messageLink {
+  color: inherit;
+  text-decoration: underline dotted color-mix(in srgb, currentColor 60%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.messageLink:hover,
+.messageLink:focus-visible {
+  color: var(--lf-link);
+  text-decoration-style: solid;
+  text-decoration-color: currentColor;
+}

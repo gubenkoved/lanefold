@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { DEMO_REPO, harnessUrl } from './paths';
-import { copyDemo, graphRow } from './support';
+import { copyDemo, git, graphRow } from './support';
 
 /**
  * Accessibility audit: axe (WCAG 2.1 A and AA) over every view and the transient UI (menus,
@@ -143,6 +143,31 @@ for (const theme of THEMES) {
       await page.keyboard.press('F2');
       await expect(page.getByRole('region', { name: /Edit history of/ })).toBeVisible();
       await audit(page, 'history editor');
+    });
+
+    test('links to the code host: the hash card, and links in a message', async ({ page }) => {
+      const repo = copyDemo();
+      git(repo, 'remote', 'set-url', 'origin', 'git@github.com:acme/aurora.git');
+      const linked = git(
+        repo,
+        'commit-tree',
+        '-p',
+        'origin/main',
+        '-m',
+        'Link the forecast docs (#12)',
+        '-m',
+        'The units changed: see https://example.com/docs/units.',
+        'origin/main^{tree}',
+      );
+      git(repo, 'update-ref', 'refs/remotes/origin/docs', linked);
+      await page.goto(harnessUrl({ repo, theme }));
+      await graphRow(page, 'Link the forecast docs').click();
+      const details = page.getByRole('complementary', { name: 'Commit details' });
+      await expect(details.getByRole('link', { name: '#12' })).toBeVisible();
+      await audit(page, 'links in a commit message');
+      await details.getByRole('button', { name: linked.slice(0, 8), exact: true }).hover();
+      await expect(page.getByRole('group', { name: `Commit ${linked}` })).toContainText('Open on GitHub');
+      await audit(page, 'the hash card');
     });
 
     test('stashes, reflog, console and compare views', async ({ page }) => {

@@ -4,6 +4,7 @@ import { openMenu, type MenuEntry } from '../../components/Menu';
 import { shortSha } from '../../graph/format';
 import { runOperation } from '../../state/operations';
 import { hostRpc } from '../../state/store';
+import type { LinkEntries } from './codeLinks';
 import { openFileHistoryTab } from './logMenus';
 import { copyWithToast } from './parts';
 import { submoduleName } from './submodules';
@@ -23,13 +24,17 @@ export interface FileMenuScope {
 /** File entries that only read: they are offered for any repository's commits. */
 const READ_ONLY_ENTRIES = new Set(['open-at', 'compare-worktree']);
 
-/** The context menu of a file in a list of changes: open it, plus `extra`, history and paths. */
+/**
+ * The context menu of a file in a list of changes: open it, plus `extra`, history and paths, and
+ * its page on the code host when `links` are given.
+ */
 export function fileMenu(
   file: ChangedFile,
   event: MouseEvent,
   open: () => void,
   extra: readonly MenuEntry[] = [],
   scope?: FileMenuScope,
+  links?: LinkEntries,
 ): void {
   if (file.submodule) {
     submoduleFileMenu(file, event, open);
@@ -46,6 +51,7 @@ export function fileMenu(
       hint: `git log -- ${file.path}`,
       onSelect: () => (scope ? scope.openHistory(file.path) : openFileHistoryTab(file.path)),
     },
+    ...(links ? [links.open] : []),
     {
       id: 'copy-path',
       label: 'Copy path',
@@ -62,6 +68,7 @@ export function fileMenu(
           } satisfies MenuEntry,
         ]
       : []),
+    ...(links ? [links.copy] : []),
   ]);
 }
 

@@ -59,6 +59,38 @@ export function containsCommits(
   return unknown ? undefined : false;
 }
 
+/**
+ * Whether the history of any of `tips` contains `sha`: true or false when the loaded rows show
+ * it, undefined when they cannot. One pass over the rows, however many tips.
+ */
+export function anyContains(graph: HistoryGraph, tips: readonly string[], sha: string): boolean | undefined {
+  const { topology } = unfiltered(graph);
+  const goal = topology.rowOfHex(sha);
+  if (goal < 0) return undefined;
+  let unknown = false;
+  const starts: number[] = [];
+  for (const tip of tips) {
+    const row = topology.rowOfHex(tip);
+    if (row < 0) unknown = true;
+    // A tip below the commit is not one of its descendants.
+    else if (row <= goal) starts.push(row);
+  }
+  if (starts.length === 0) return unknown ? undefined : false;
+  const start = Math.min(...starts);
+  const reached = new Uint8Array(goal - start + 1);
+  for (const row of starts) reached[row - start] = 1;
+  for (let row = start; row < goal && !reached[goal - start]; row++) {
+    if (!reached[row - start]) continue;
+    for (let k = 0, count = topology.parentCount(row); k < count; k++) {
+      const parent = topology.parentRow(row, k);
+      if (parent < 0) unknown = true;
+      else if (parent <= goal) reached[parent - start] = 1;
+    }
+  }
+  if (reached[goal - start]) return true;
+  return unknown ? undefined : false;
+}
+
 /** Whether what is checked out already has a commit, or all of some (undefined when the graph cannot tell). */
 export function headContains(graph: HistoryGraph, shas: string | readonly string[]): boolean | undefined {
   const head = unfiltered(graph).refs.head.sha;

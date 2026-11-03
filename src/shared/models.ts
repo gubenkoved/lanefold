@@ -1,5 +1,7 @@
 /** Data shapes shared by the extension host, the dev harness and the webview. */
 
+import { DEFAULT_LINK_SETTINGS, type LinkSettings } from './codeHosts';
+
 export interface RepoSummary {
   /** Stable id (the repository root path). */
   readonly id: string;
@@ -38,6 +40,8 @@ export interface Settings {
   readonly dateFormat: 'relative' | 'absolute';
   readonly gravatar: boolean;
   readonly defaultTabs: readonly DefaultTabTemplate[];
+  /** Code hosts Lanefold cannot tell by name, and issue references to link (`lanefold.links.*`). */
+  readonly links: LinkSettings;
 }
 
 export interface DefaultTabTemplate {
@@ -58,6 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
     { name: 'All', refs: 'all' },
     { name: 'HEAD', refs: 'head' },
   ],
+  links: DEFAULT_LINK_SETTINGS,
 };
 
 /** One git command as shown in the Git Console. */

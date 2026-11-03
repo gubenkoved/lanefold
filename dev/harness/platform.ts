@@ -88,6 +88,14 @@ export class HarnessPlatform implements Platform {
     return picked;
   }
 
+  /** Web pages the webview asked to open (the harness opens none; e2e tests inspect this list). */
+  readonly openedLinks: string[] = [];
+
+  async openExternal(url: string): Promise<void> {
+    this.openedLinks.push(url);
+    console.log(`[harness] open ${url}`);
+  }
+
   /** Registers and watches another repository in the session (the server sets this up). */
   opener: ((folder: string) => Promise<Repository | undefined>) | undefined;
 

@@ -6,6 +6,7 @@ import { isWorkingTreeSha } from '../../graph/format';
 import { GraphPane } from '../../graph/GraphPane';
 import type { EmptyNote, GraphView, Highlight } from '../../graph/GraphView';
 import { useHost } from '../../hostContext';
+import { useCodeHosts } from '../../state/codeHosts';
 import { useOperations } from '../../state/operations';
 import { operationMarks } from './marks';
 import { takeReveal, useReveal } from '../../state/reveal';
@@ -118,6 +119,8 @@ export function LogView({ tab, repoId, active }: LogViewProps) {
 
   const loaded = useLogModel(repoId, view, active, () => graphRef.current?.topRow ?? 0);
   const source = loaded?.model;
+  // Read for the menus, which offer links to the code host as they open.
+  useCodeHosts(repoId);
   const search = useLogSearch(repoId, view, source, undefined, tab.search);
   // A tab opened on a search (an author's commits) keeps it, as it changes, until it is cleared.
   useEffect(() => {

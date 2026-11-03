@@ -76,6 +76,20 @@ shows the git commands it will use, and every change it makes to the repository 
 
 ![The Switch Branch picker over the Lanefold graph, with recent branches first, and the branch in the status bar](https://gist.githubusercontent.com/gubenkoved/66fff765499dc9a41fddfc132bbf5861/raw/switch-branch.png)
 
+### Code hosts
+
+- Lanefold reads which code host each remote is on: GitHub, GitLab, Bitbucket, Azure DevOps,
+  Gitea and Forgejo, and self-hosted servers named after them. Remote URLs are read as git uses
+  them, with `insteadOf` rewrites and SSH host aliases; other servers can be named in a setting.
+- Pointing at a commit's hash in its details offers the commit there: open it, or copy its link.
+  Menus open commits, comparisons, branches, tags and changed files.
+- A link goes to a remote that has the commit; for a commit not pushed yet, Lanefold says so
+  instead.
+- Issue references (`#12`, GitLab's `!12`) and web addresses in commit messages are links, and
+  so are references set up like GitHub's autolinks (`PROJ-12`).
+- In the editor, Copy Permalink and Open on Remote link the selected lines as of the newest
+  commit a remote has.
+
 ### More
 
 - Statistics for a branch or the whole repository: activity over time, a weekday by hour punch
@@ -130,6 +144,8 @@ editor, dropping a commit onto another squashes it (<kbd>Alt</kbd> for fixup).
 | `lanefold.blame.author`           | `full`        | How annotations name authors: `full`, `first`, `firstInitial`, `initials`, `email`… |
 | `lanefold.blame.date`             | `auto`        | How annotations date changes: `auto`, `relative`, `date`, `iso` or `none`.          |
 | `lanefold.blame.heat`             | on            | Tint annotations by the age of the change.                                          |
+| `lanefold.links.hosts`            | none          | Self-hosted code hosts, by host name: `{ "git.example.com": "gitlab" }`.            |
+| `lanefold.links.autolinks`        | none          | More issue references to link: `[{ "prefix": "PROJ-", "url": "https://…/<num>" }]`. |
 | `lanefold.git.path`               | none          | The git executable. By default, the one VS Code's Git extension uses, then `PATH`.  |
 
 ## Development

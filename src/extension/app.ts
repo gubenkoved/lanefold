@@ -2,6 +2,7 @@ import { chmodSync } from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { Backend } from '../core/backend/backend';
+import { linesAt } from '../core/blame/blame';
 import { ConsoleLog, combineListeners } from '../core/console/consoleLog';
 import { findGit, isSupportedVersion, MIN_SUPPORTED_GIT } from '../core/git/binary';
 import { AskpassServer, type AskpassRequest } from '../core/ipc/askpass';
@@ -16,7 +17,8 @@ import { BlameController } from './blame/blameController';
 import { getBuiltinGitApi } from './builtinGit';
 import { cloneRepository, initRepository } from './cloneInit';
 import { createConsoleChannel } from './consoleChannel';
-import { linesAtHead, locateFile } from './fileLocation';
+import { editorLink, trackHostedEditor, type EditorLink } from './codeLinks';
+import { locateFile } from './fileLocation';
 import { RepoDiscovery } from './repoDiscovery';
 import { RevisionFileSystem } from './revisionFs';
 import { VscodePlatform } from './vscodePlatform';
@@ -79,6 +81,7 @@ export class LanefoldApp implements vscode.Disposable {
         },
       ),
       this.blame,
+      trackHostedEditor(this.registry),
       new StatusBar(this.registry),
       this.registry.onDidChangeRepos(() => {
         void context.workspaceState.update(ACTIVE_REPO_KEY, this.registry.active?.id);
@@ -160,6 +163,14 @@ export class LanefoldApp implements vscode.Disposable {
       command('lanefold.lineHistory', async () => {
         await this.ready;
         await this.lineHistory();
+      }),
+      command('lanefold.links.copy', async () => {
+        await this.ready;
+        await this.linkSelection('copy');
+      }),
+      command('lanefold.links.open', async () => {
+        await this.ready;
+        await this.linkSelection('open');
       }),
       command('lanefold.switchBranch', async () => {
         const repo = await this.activeRepo();
@@ -396,7 +407,7 @@ export class LanefoldApp implements vscode.Disposable {
     if (!location.rev) {
       try {
         const unsaved = editor.document.isDirty ? editor.document.getText() : undefined;
-        ({ start, end } = await linesAtHead(location.repo, location.path, start, end, unsaved));
+        ({ start, end } = await linesAt(location.repo, 'HEAD', location.path, start, end, unsaved));
       } catch {
         void vscode.window.showInformationMessage(
           `Lanefold: ${path.basename(location.path)} has no history yet (it is not committed).`,
@@ -411,6 +422,34 @@ export class LanefoldApp implements vscode.Disposable {
       end,
       rev: location.rev,
     });
+  }
+
+  /** Copy Permalink and Open on Remote: the selected lines of the active editor on the code host. */
+  private async linkSelection(action: 'copy' | 'open'): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      void vscode.window.showInformationMessage('Lanefold: open a file of a git repository first.');
+      return;
+    }
+    let link: EditorLink;
+    try {
+      link = await editorLink(this.registry, editor);
+    } catch (error) {
+      void vscode.window.showErrorMessage(
+        `Lanefold: could not make the link: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return;
+    }
+    if ('reason' in link) {
+      void vscode.window.showInformationMessage(`Lanefold: ${link.reason}`);
+      return;
+    }
+    if (action === 'open') await vscode.env.openExternal(vscode.Uri.parse(link.url, true));
+    else {
+      await vscode.env.clipboard.writeText(link.url);
+      vscode.window.setStatusBarMessage(`$(link) Copied a link to ${link.host.name}`, 4000);
+    }
+    if (link.warning) void vscode.window.showWarningMessage(`Lanefold: ${link.warning}`);
   }
 
   /** Hooks for the VS Code integration tests (exported only in test mode). */

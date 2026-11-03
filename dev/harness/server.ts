@@ -271,6 +271,18 @@ function handle(request: IncomingMessage, response: ServerResponse): void {
     void pending.then(({ platform }) =>
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(platform.commands)),
     );
+  } else if (url.pathname === '/debug/opened-links') {
+    // For e2e tests: the web pages a session asked to open (code host links).
+    const pending = sessionOf(url);
+    if (!pending) {
+      response.writeHead(404).end('No such session');
+      return;
+    }
+    void pending.then(({ platform }) =>
+      response
+        .writeHead(200, { 'content-type': 'application/json' })
+        .end(JSON.stringify(platform.openedLinks)),
+    );
   } else if (url.pathname === '/debug/focus') {
     // For e2e tests: where the webview reports focus (whether Ctrl+Z would undo git operations).
     const pending = sessionOf(url);

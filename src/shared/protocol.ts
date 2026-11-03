@@ -1,3 +1,4 @@
+import type { CodeHost } from './codeHosts';
 import type { TopologyChunk } from './graph/topology';
 import type { DiffArea, FileHunks, LineSelection } from './hunks';
 import type {
@@ -188,10 +189,17 @@ export interface HostApi {
   'patch.save'(params: { repoId: string; shas: readonly string[] }): string | null;
   /** Asks the person to choose a file; its path, or null if cancelled. */
   'host.pickFile'(params: { repoId: string; title: string }): string | null;
+  /** Opens a web page (an http or https URL) in the browser. */
+  'host.openExternal'(params: { url: string }): void;
   /** The repository's working trees (the main one first). */
   'worktree.list'(params: { repoId: string }): readonly WorktreeInfo[];
   /** The repository's remotes, fetched or not (URLs with credentials hidden). */
   'repo.remotes'(params: { repoId: string }): readonly RemoteInfo[];
+  /**
+   * The repository's remotes on a code host (GitHub, GitLab…), in the order links prefer them:
+   * the remote and its repository, and where it is on the web. Empty when none is.
+   */
+  'repo.codeHosts'(params: { repoId: string }): readonly CodeHost[];
   /** The repository's submodules (top-level ones, in .gitmodules order). */
   'submodule.list'(params: { repoId: string }): readonly SubmoduleInfo[];
   /**

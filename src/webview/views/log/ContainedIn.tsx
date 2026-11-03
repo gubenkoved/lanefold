@@ -83,21 +83,27 @@ function Pills({
   );
 }
 
+/** The refs known to contain a commit, without asking git (undefined: not known for these refs). */
+export function knownContainment(
+  repoId: string,
+  sha: string,
+  refs: RefsSnapshot,
+): readonly RefInfo[] | undefined {
+  const known = cache.get(`${repoId}\0${sha}`);
+  return known?.refs === refs ? known.containing : undefined;
+}
+
+/** The refs that contain a commit, once git has said (see {@link useContainedIn}). */
+export interface Containment {
+  readonly containing?: readonly RefInfo[];
+  readonly error?: string;
+}
+
 /**
- * The branches, remote branches and tags whose history holds a commit: where a change has got
- * to (merged into the trunk yet? in which release first?). Choosing one goes to its commit.
+ * The branches, remote branches and tags whose history holds a commit. git is asked once the
+ * selection settles, and answers are kept while the view's refs stay as they were.
  */
-export function ContainedIn({
-  repoId,
-  model,
-  sha,
-  onReveal,
-}: {
-  repoId: string;
-  model: LogModel;
-  sha: string;
-  onReveal: (sha: string) => void;
-}) {
+export function useContainedIn(repoId: string, model: LogModel, sha: string): Containment {
   const host = useHost();
   const version = useRepoVersion(host.rpc, repoId);
   const key = `${repoId}\0${sha}`;
@@ -110,14 +116,32 @@ export function ContainedIn({
     remember(key, snapshot, containing);
     return { sha, containing };
   });
-  const containing = cached ?? (query.data?.sha === sha ? query.data.containing : undefined);
+  return {
+    containing: cached ?? (query.data?.sha === sha ? query.data.containing : undefined),
+    error: query.error,
+  };
+}
 
+/**
+ * The branches, remote branches and tags whose history holds a commit: where a change has got
+ * to (merged into the trunk yet? in which release first?). Choosing one goes to its commit.
+ */
+export function ContainedIn({
+  model,
+  containment,
+  onReveal,
+}: {
+  model: LogModel;
+  containment: Containment;
+  onReveal: (sha: string) => void;
+}) {
+  const { containing, error } = containment;
   if (!containing) {
     return (
       <p className={styles.quiet}>
-        {query.error ? (
+        {error ? (
           <>
-            <Icon name="error" /> The branches that contain it could not be listed: {query.error}
+            <Icon name="error" /> The branches that contain it could not be listed: {error}
           </>
         ) : (
           <>
@@ -127,6 +151,7 @@ export function ContainedIn({
       </p>
     );
   }
+  const snapshot = model.refs;
   const branches = orderBranches(containing, snapshot.trunk);
   // Oldest first (git sorts them by date): the first is the first release to have the commit.
   const tags = containing.filter((ref) => ref.kind === 'tag');

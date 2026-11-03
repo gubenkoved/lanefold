@@ -65,6 +65,8 @@ export interface Platform {
   saveFile(repo: Repository, suggestedName: string, content: Uint8Array): Promise<string | undefined>;
   /** Asks the person to choose a file (a patch, say); its path, or undefined if cancelled. */
   pickFile(repo: Repository, title: string): Promise<string | undefined>;
+  /** Opens a web page (an http or https URL) in the browser. */
+  openExternal(url: string): Promise<void>;
   /**
    * Makes the repository at `folder` (a submodule or worktree of an open repository) one the
    * host knows: registered and watched like those it found itself. Undefined if there is none.

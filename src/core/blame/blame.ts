@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { assertRevision, revisions } from '../git/args';
+import { assertRevision, filePaths, revisions } from '../git/args';
 import type { Repository } from '../repo/repository';
 
 export interface BlameOptions {
@@ -110,6 +110,43 @@ export async function diffWithContents(repo: Repository, blob: string, contents:
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Lines `start`–`end` of the file (on disk, or the editor's unsaved `contents`), as lines of its
+ * version at `rev` (`git log -L` looks the lines up in HEAD's): edits since shift them. `changed`:
+ * some of the lines themselves differ there (an edit maps to the lines it replaced).
+ */
+export async function linesAt(
+  repo: Repository,
+  rev: string,
+  file: string,
+  start: number,
+  end: number,
+  contents?: string,
+): Promise<{ start: number; end: number; changed: boolean }> {
+  const { stdout } =
+    contents !== undefined
+      ? { stdout: await diffWithContents(repo, `${rev}:${file}`, contents) }
+      : await repo.git(
+          [
+            'diff',
+            '-U0',
+            '--no-color',
+            '--no-ext-diff',
+            '--no-textconv',
+            ...revisions(rev),
+            ...filePaths(file),
+          ],
+          { readOnly: true, background: true, label: 'Map lines' },
+        );
+  const hunks = parseHunks(stdout);
+  const a = mapLineToOld(hunks, start);
+  const b = mapLineToOld(hunks, end);
+  const changed = hunks.some(
+    (hunk) => hunk.newCount > 0 && hunk.newStart <= end && hunk.newStart + hunk.newCount - 1 >= start,
+  );
+  return { start: Math.min(a, b), end: Math.max(a, b), changed };
 }
 
 /** The full message of a commit (for hovers). */

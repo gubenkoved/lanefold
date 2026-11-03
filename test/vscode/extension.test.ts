@@ -74,6 +74,31 @@ suite('Lanefold', () => {
     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
   });
 
+  test('copies a permalink to the selected lines, as of the newest commit a remote has', async () => {
+    const { testing } = await api();
+    const repo = await waitFor(() => testing!.repositories().find((root) => root.endsWith('aurora')));
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' }).trim();
+    const url = git('remote', 'get-url', 'origin');
+    git('remote', 'set-url', 'origin', 'git@github.com:acme/aurora.git');
+    try {
+      // main has a commit origin has not: the link is at origin/main, where the lines are the same.
+      const pushed = git('rev-parse', 'origin/main');
+      const document = await vscode.workspace.openTextDocument(join(repo, 'src', 'forecast.ts'));
+      const editor = await vscode.window.showTextDocument(document);
+      editor.selection = new vscode.Selection(1, 0, 3, 0);
+      await vscode.env.clipboard.writeText('');
+      await vscode.commands.executeCommand('lanefold.links.copy');
+      assert.equal(
+        await waitFor(async () => (await vscode.env.clipboard.readText()) || undefined),
+        `https://github.com/acme/aurora/blob/${pushed}/src/forecast.ts#L2-L3`,
+      );
+      await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+    } finally {
+      git('remote', 'set-url', 'origin', url);
+    }
+  });
+
   test('pops a view out into an editor tab, titled after the view it shows', async () => {
     const { testing } = await api();
     const before = testing!.readyWebviews();

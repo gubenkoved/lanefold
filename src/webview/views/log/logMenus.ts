@@ -19,6 +19,7 @@ import {
   editableHistory,
   selectionRewriteEntries,
 } from '../rewrite/entryPoints';
+import { commitLinkEntries, refLinkEntries } from './codeLinks';
 import { openAllDiffs } from './diffActions';
 import { copyWithToast } from './parts';
 import { editBlocker, headContains } from './reach';
@@ -306,7 +307,8 @@ export function showRowMenu(context: MenuContext, row: number, x: number, y: num
       },
     ];
   };
-  const copyEntries = (shas: readonly string[]): MenuEntry[] => {
+  /** Copy entries for the selection; `link` copies the one commit's link on its code host. */
+  const copyEntries = (shas: readonly string[], link?: MenuEntry): MenuEntry[] => {
     const commits = shas.filter((s) => !isWorkingTreeSha(s));
     if (commits.length === 0) return [];
     if (commits.length > 1) {
@@ -363,6 +365,7 @@ export function showRowMenu(context: MenuContext, row: number, x: number, y: num
                   toast('Could not read the message', { kind: 'error', detail: errorText(error) }),
               ),
           },
+          ...(link ? [link] : []),
         ],
       },
       ...patchEntries([sha]),
@@ -440,6 +443,7 @@ export function showRowMenu(context: MenuContext, row: number, x: number, y: num
               hint: `git log ${shortSha(older)}...${shortSha(newer)}`,
               onSelect: () => openCompareTab(older, newer, 'two-dot'),
             },
+            ...compareLinks(context, older, newer),
           ] satisfies MenuEntry[])),
       ...several,
       ...selectionRewriteEntries(model, commitsOnly),
@@ -576,6 +580,7 @@ export function showRowMenu(context: MenuContext, row: number, x: number, y: num
       onSelect: () => void runOperation({ kind: 'reset', to: sha, mode: 'mixed' }),
     },
   ];
+  const links = commitLinkEntries(context, { kind: 'commit', sha }, [sha], { copy: 'Link' });
   openMenu(anchor, [
     {
       id: 'open',
@@ -677,11 +682,21 @@ export function showRowMenu(context: MenuContext, row: number, x: number, y: num
         },
       ],
     },
+    ...(links ? [links.open] : []),
     ...operations,
     ...rewriteEntries(model, sha),
     ...bisectEntries(sha),
-    ...copyEntries([sha]),
+    ...copyEntries([sha], links && { ...links.copy, icon: undefined }),
   ]);
+}
+
+/** The comparison of two commits on the code host, when the repository is on one. */
+function compareLinks(context: MenuContext, older: string, newer: string): MenuEntry[] {
+  const links = commitLinkEntries(context, { kind: 'compare', from: older, to: newer }, [older, newer], {
+    open: (host) => `Open the comparison on ${host.name}`,
+    copy: 'Copy link',
+  });
+  return links ? [links.open] : [];
 }
 
 const KIND_LABEL: Record<RefInfo['kind'], string> = { branch: 'Branch', remote: 'Remote branch', tag: 'Tag' };
@@ -795,6 +810,7 @@ export function showRefMenu(
   extra: readonly MenuEntry[] = [],
 ): void {
   const { model, graph } = context;
+  const links = refLinkEntries(context, ref);
   const anchor =
     event.currentTarget instanceof Element && event.type !== 'contextmenu'
       ? event.currentTarget
@@ -1014,9 +1030,11 @@ export function showRefMenu(
           },
         ] satisfies MenuEntry[])
       : []),
+    ...(links ? [links.open] : []),
     { kind: 'separator' },
     ...extra,
     { id: 'copy', label: 'Copy name', icon: 'copy', onSelect: () => void copyWithToast(ref.short, 'name') },
+    ...(links ? [links.copy] : []),
   ]);
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { HeadInfo, RefInfo } from '../../src/shared/models';
 import {
+  anyContains,
   containsCommits,
   editBlocker,
   headContains,
@@ -92,6 +93,25 @@ describe('containsCommits', () => {
   it('reads a filtered model through its source', () => {
     const filtered: HistoryGraph = { ...graph({ history: [['m3', []]] }), source: g };
     expect(containsCommits(filtered, sha('m3'), [sha('s1')])).toBe(true);
+  });
+});
+
+describe('anyContains', () => {
+  const g = graph();
+
+  it('tells whether any tip has the commit, in one pass', () => {
+    // origin/main (m2) and origin/feature/y (y1): what the remote has.
+    const remote = [sha('m2'), sha('y1')];
+    expect(anyContains(g, remote, sha('m1'))).toBe(true);
+    expect(anyContains(g, remote, sha('s1'))).toBe(true);
+    expect(anyContains(g, remote, sha('m3'))).toBe(false);
+    expect(anyContains(g, remote, sha('f1'))).toBe(false);
+    expect(anyContains(g, [], sha('m1'))).toBe(false);
+  });
+
+  it('cannot tell for commits or tips not loaded', () => {
+    expect(anyContains(g, [sha('m2')], sha('elsewhere'))).toBeUndefined();
+    expect(anyContains(g, [sha('elsewhere')], sha('m3'))).toBeUndefined();
   });
 });
 

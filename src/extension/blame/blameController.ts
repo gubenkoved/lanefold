@@ -14,10 +14,13 @@ import {
   type BlameDateStyle,
   type BlameResult,
 } from '../../shared/blame';
+import { linkMessage, type Autolink, type CodeHost } from '../../shared/codeHosts';
 import { isObjectId } from '../../shared/oid';
 import { absoluteTime, relativeLong } from '../../shared/time';
+import { commitLink, hostsOf } from '../codeLinks';
 import { locateFile } from '../fileLocation';
 import { EMPTY_REVISION, parseRevisionUri, REVISION_SCHEME, revisionUri } from '../revisionFs';
+import { readSettings } from '../vscodePlatform';
 import { heatColors, heatScale, type HeatColors } from './heat';
 
 /** What a document's blame is computed for. */
@@ -59,6 +62,7 @@ const COMMANDS = {
   showCommit: 'lanefold.blame.showCommit',
   openChanges: 'lanefold.blame.openChanges',
   copyHash: 'lanefold.blame.copyHash',
+  openOnHost: 'lanefold.blame.openOnHost',
 } as const;
 
 const key = (uri: vscode.Uri) => uri.toString();
@@ -211,6 +215,7 @@ export class BlameController implements vscode.Disposable {
       await vscode.env.clipboard.writeText(args.sha);
       void vscode.window.setStatusBarMessage(`$(check) Copied ${short(args.sha)}`, 2000);
     });
+    command(COMMANDS.openOnHost, (args?: { repo: string; sha: string }) => this.openOnHost(args));
 
     this.disposables.push(
       { dispose: () => this.styles.all.forEach((type) => type.dispose()) },
@@ -457,9 +462,13 @@ export class BlameController implements vscode.Disposable {
       this.messages.set(commit.sha, message);
       if (this.messages.size > 500) this.messages.delete(this.messages.keys().next().value as string);
     }
+    const hosts = await hostsOf(repo);
+    if (token.isCancellationRequested) return undefined;
+    const { autolinks } = readSettings().links;
+    const linked = (text: string) => linkedMarkdown(text, hosts[0], autolinks);
     const [subject, ...rest] = message.split('\n');
     const body = rest.join('\n').trim();
-    md.appendMarkdown(`$(git-commit) **${escapeMarkdown(subject ?? commit.summary)}**\n\n`);
+    md.appendMarkdown(`$(git-commit) **${linked(subject ?? commit.summary)}**\n\n`);
     md.appendMarkdown(
       `${escapeMarkdown(commit.author)} \\<${escapeMarkdown(commit.authorMail)}\\>, ${relativeLong(commit.authorTime)} · ${absoluteTime(commit.authorTime)}`,
     );
@@ -468,8 +477,7 @@ export class BlameController implements vscode.Disposable {
         `  \ncommitted by ${escapeMarkdown(commit.committer)}, ${relativeLong(commit.committerTime)}`,
       );
     }
-    if (body)
-      md.appendMarkdown(`\n\n${escapeMarkdown(body.length > 1200 ? `${body.slice(0, 1200)}…` : body)}`);
+    if (body) md.appendMarkdown(`\n\n${linked(body.length > 1200 ? `${body.slice(0, 1200)}…` : body)}`);
     if (commit.filename !== state.target.path)
       md.appendMarkdown(
         `\n\n$(arrow-right) In this commit the file was \`${escapeMarkdown(commit.filename)}\`.`,
@@ -481,6 +489,11 @@ export class BlameController implements vscode.Disposable {
       commit.previous
         ? `[$(history) Annotate previous revision](${commandLink(COMMANDS.previous, lineArgs)} "Blame the file as it was before this commit, at this line")`
         : '$(history) _added in this commit_',
+      ...(hosts[0]
+        ? [
+            `[$(link-external) ${escapeMarkdown(hosts[0].name)}](${commandLink(COMMANDS.openOnHost, { repo: repo.id, sha: commit.sha })} "Open this commit on ${escapeMarkdown(hosts[0].name)}")`,
+          ]
+        : []),
       `[$(copy) ${short(commit.sha)}](${commandLink(COMMANDS.copyHash, { sha: commit.sha })} "Copy the full hash")`,
     ];
     md.appendMarkdown(`\n\n---\n\n${actions.join(' &nbsp;·&nbsp; ')}`);
@@ -602,6 +615,17 @@ export class BlameController implements vscode.Disposable {
     if (repo && args) await this.revealCommit(repo, args.sha);
   }
 
+  /** Opens a blamed line's commit on the code host (where a remote has it). */
+  private async openOnHost(args?: { repo: string; sha: string }): Promise<void> {
+    const repo = args && this.registry.get(args.repo);
+    if (!repo || !args || !isObjectId(args.sha)) return;
+    const link = await commitLink(repo, args.sha).catch((error: unknown) => ({
+      reason: describeFailure(error),
+    }));
+    if ('url' in link) await vscode.env.openExternal(vscode.Uri.parse(link.url, true));
+    else void vscode.window.showInformationMessage(`Lanefold: ${link.reason}`);
+  }
+
   private async openChanges(args?: { repo: string; sha: string; path: string }): Promise<void> {
     const repo = args && this.registry.get(args.repo);
     if (!repo || !args || !isObjectId(args.sha) || typeof args.path !== 'string') return;
@@ -670,6 +694,13 @@ export class BlameController implements vscode.Disposable {
 
 function escapeMarkdown(text: string): string {
   return text.replace(/[\\`*_{}[\]()#+\-.!|<>~]/g, (ch) => `\\${ch}`);
+}
+
+/** Markdown of a message whose web addresses and issue references link (`host`: whose issues `#12` names). */
+function linkedMarkdown(text: string, host: CodeHost | undefined, autolinks: readonly Autolink[]): string {
+  return linkMessage(text, host, autolinks)
+    .map((part) => (part.url ? `[${escapeMarkdown(part.text)}](<${part.url}>)` : escapeMarkdown(part.text)))
+    .join('');
 }
 
 function describeFailure(error: unknown): string {

@@ -13,6 +13,7 @@ import { validJournal } from '../ops/journal';
 import { RepoOperations } from '../ops/operations';
 import { conflictStages } from '../ops/opState';
 import { takeSnapshot } from '../ops/snapshot';
+import { readCodeHosts } from '../repo/codeHosts';
 import {
   applyToIndex,
   checkArea,
@@ -33,7 +34,7 @@ import { readWorktrees } from '../repo/worktrees';
 import { checkLineCounting, checkStatsQuery, checkStatsScope, StatsService } from '../stats/repoStats';
 import { DisposableStore, Emitter, type Disposable } from '../util/emitter';
 import { paths } from '../util/paths';
-import { checkCount, checkFilePaths, checkObjectId, checkOneOf, checkRev } from './params';
+import { checkCount, checkFilePaths, checkObjectId, checkOneOf, checkRev, checkWebUrl } from './params';
 import type { Platform } from './platform';
 import { openReposLog } from './reposLog';
 
@@ -397,6 +398,7 @@ export class Backend implements Disposable {
       'reflog.list': ({ repoId, limit }) => readReflog(this.repo(repoId), checkCount(limit, 5000)),
       'worktree.list': ({ repoId }) => readWorktrees(this.repo(repoId)),
       'repo.remotes': ({ repoId }) => this.data(repoId).remotes({ shared: true }),
+      'repo.codeHosts': ({ repoId }) => readCodeHosts(this.repo(repoId), platform.getSettings().links),
       'submodule.list': ({ repoId }) => readSubmodules(this.repo(repoId)),
       // Only a submodule or worktree of a repository already open: never any folder asked for.
       'repo.openLinked': async ({ repoId, path }) => {
@@ -417,6 +419,7 @@ export class Backend implements Disposable {
       },
       'host.pickFile': async ({ repoId, title }) =>
         (await platform.pickFile(this.repo(repoId), title)) ?? null,
+      'host.openExternal': ({ url }) => platform.openExternal(checkWebUrl(url)),
       'stash.list': ({ repoId }) => this.data(repoId).stashList(),
       'stash.details': ({ repoId, sha }) => this.data(repoId).stashDetails(sha),
       'diff.files': ({ repoId, base, target }) =>

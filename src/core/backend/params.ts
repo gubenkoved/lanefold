@@ -38,3 +38,16 @@ export function checkFilePaths(value: unknown): readonly string[] {
   if (!Array.isArray(value) || !value.every(isFilePath)) throw new Error('Not a list of file paths.');
   return value;
 }
+
+/** A web page's address: http or https only (never a file, a command or a script). */
+export function checkWebUrl(value: unknown): string {
+  let url: URL | undefined;
+  try {
+    url = typeof value === 'string' ? new URL(value) : undefined;
+  } catch {
+    url = undefined;
+  }
+  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:'))
+    throw new Error(`Not a web address: ${String(value)}.`);
+  return value as string;
+}

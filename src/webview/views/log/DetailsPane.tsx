@@ -1,4 +1,5 @@
 import { useMemo, useState, type MouseEvent } from 'react';
+import type { Autolink, CodeHost } from '../../../shared/codeHosts';
 import type { ChangedFile, CommitDetails, CommitMeta, CompareSummary } from '../../../shared/models';
 import { errorText } from '../../bridge/errorText';
 import { EmptyState } from '../../components/EmptyState';
@@ -9,16 +10,19 @@ import { toast } from '../../components/Toast';
 import { absoluteTime, isWorkingTreeSha, relativeLong, shortSha } from '../../graph/format';
 import type { LogModel } from '../../graph/logModel';
 import { useHost } from '../../hostContext';
+import { useCodeHosts } from '../../state/codeHosts';
 import { changeIndex } from '../../state/indexChanges';
 import { runOperation } from '../../state/operations';
 import { fetchCommitDetails, useQuery, useRepoVersion } from '../../state/queries';
-import { showStashes } from '../../state/store';
+import { showStashes, useApp } from '../../state/store';
 import { openStats, STATS_ICON } from '../stats/statsTab';
+import { fileLinkEntries } from './codeLinks';
 import { CommitBox } from './CommitBox';
-import { ContainedIn } from './ContainedIn';
+import { ContainedIn, useContainedIn } from './ContainedIn';
 import { openAllDiffs, openFileDiff, sideLabel } from './diffActions';
 import { FileAction, FileList, totals, TreeToggle } from './FileList';
 import { commitFileEntries, fileMenu, type FileMenuScope } from './fileMenus';
+import { HashCard } from './HashCard';
 import { useInlineDiffs } from './InlineDiff';
 import {
   ActionButton,
@@ -26,6 +30,7 @@ import {
   CommitChip,
   ErrorLine,
   LoadingLine,
+  MessageText,
   Notice,
   RefPills,
   Section,
@@ -208,6 +213,8 @@ function CommitHeader({
   model,
   onReveal,
   stats,
+  hosts,
+  autolinks,
 }: {
   repoId: string;
   meta: CommitMeta;
@@ -215,19 +222,33 @@ function CommitHeader({
   onReveal: (sha: string) => void;
   /** Offers the author's statistics. */
   stats?: boolean;
+  /** The repository's code hosts (see useCodeHosts). */
+  hosts: readonly CodeHost[] | undefined;
+  autolinks: readonly Autolink[];
 }) {
   const refs = model.refsAt(model.rowOf(meta.sha)) ?? [];
+  const containment = useContainedIn(repoId, model, meta.sha);
   const committedSeparately =
     meta.committer !== meta.author ||
     meta.committerEmail !== meta.authorEmail ||
     Math.abs(meta.committerTime - meta.authorTime) > 60;
   return (
     <header className={styles.header}>
-      <h2 className={styles.subject}>{meta.subject || <em>(no message)</em>}</h2>
+      <h2 className={styles.subject}>
+        {meta.subject ? (
+          <MessageText text={meta.subject} host={hosts?.[0]} autolinks={autolinks} />
+        ) : (
+          <em>(no message)</em>
+        )}
+      </h2>
       <Identity meta={meta} verb="authored" stats={stats} />
       {committedSeparately ? <Identity meta={meta} verb="committed" /> : null}
       <div className={styles.chips}>
-        <ShaChip sha={meta.sha} />
+        {hosts?.length ? (
+          <HashCard sha={meta.sha} hosts={hosts} containment={containment} />
+        ) : (
+          <ShaChip sha={meta.sha} />
+        )}
         {meta.parents.map((parent, index) => (
           <span key={parent} className={styles.parent}>
             <span className={styles.parentLabel}>
@@ -250,13 +271,15 @@ function CommitHeader({
         ) : null}
       </div>
       {refs.length > 0 ? <RefPills refs={refs} /> : null}
-      <ContainedIn repoId={repoId} model={model} sha={meta.sha} onReveal={onReveal} />
+      <ContainedIn model={model} containment={containment} onReveal={onReveal} />
     </header>
   );
 }
 
 function CommitDetailsView({ repoId, model, sha, onReveal, scope }: DetailsPaneProps & { sha: string }) {
   const host = useHost();
+  const hosts = useCodeHosts(repoId);
+  const autolinks = useApp((state) => state.settings.links.autolinks);
   const details = useQuery<CommitDetails>(`${repoId}:${sha}`, () =>
     fetchCommitDetails(host.rpc, repoId, sha),
   );
@@ -269,8 +292,20 @@ function CommitDetailsView({ repoId, model, sha, onReveal, scope }: DetailsPaneP
   const isMerge = meta.parents.length > 1;
   return (
     <div className={styles.scroll}>
-      <CommitHeader repoId={repoId} meta={meta} model={model} onReveal={onReveal} stats={!scope} />
-      {current?.body ? <pre className={styles.body}>{current.body}</pre> : null}
+      <CommitHeader
+        repoId={repoId}
+        meta={meta}
+        model={model}
+        onReveal={onReveal}
+        stats={!scope}
+        hosts={hosts}
+        autolinks={autolinks}
+      />
+      {current?.body ? (
+        <pre className={styles.body}>
+          <MessageText text={current.body} host={hosts?.[0]} autolinks={autolinks} />
+        </pre>
+      ) : null}
       {isMerge ? (
         <Notice icon="git-merge">
           Merge commit — changes are shown against the first parent ({shortSha(meta.parents[0]!)}).
@@ -308,6 +343,7 @@ function CommitDetailsView({ repoId, model, sha, onReveal, scope }: DetailsPaneP
                 () => openFileDiff(host.rpc, repoId, file, base, sha),
                 commitFileEntries(repoId, file, sha, base, scope),
                 scope,
+                fileLinkEntries({ rpc: host.rpc, repoId, model }, file, sha, base),
               )
             }
           />

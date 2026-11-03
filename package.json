@@ -255,6 +255,23 @@
         "command": "lanefold.blame.copyHash",
         "title": "Copy Commit Hash",
         "category": "Lanefold"
+      },
+      {
+        "command": "lanefold.blame.openOnHost",
+        "title": "Open the Commit on Its Code Host",
+        "category": "Lanefold"
+      },
+      {
+        "command": "lanefold.links.copy",
+        "title": "Copy Permalink",
+        "category": "Lanefold",
+        "icon": "$(link)"
+      },
+      {
+        "command": "lanefold.links.open",
+        "title": "Open on Remote",
+        "category": "Lanefold",
+        "icon": "$(link-external)"
       }
     ],
     "menus": {
@@ -312,6 +329,16 @@
           "command": "lanefold.lineHistory",
           "when": "editorTextFocus && (resourceScheme == file || resourceScheme == lanefold)",
           "group": "lanefold@4"
+        },
+        {
+          "command": "lanefold.links.copy",
+          "when": "editorTextFocus && lanefold.links.hosted && (resourceScheme == file || resourceScheme == lanefold)",
+          "group": "lanefold@5"
+        },
+        {
+          "command": "lanefold.links.open",
+          "when": "editorTextFocus && lanefold.links.hosted && (resourceScheme == file || resourceScheme == lanefold)",
+          "group": "lanefold@6"
         }
       ],
       "commandPalette": [
@@ -357,6 +384,18 @@
         },
         {
           "command": "lanefold.lineHistory",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "lanefold.blame.openOnHost",
+          "when": "false"
+        },
+        {
+          "command": "lanefold.links.copy",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "lanefold.links.open",
           "when": "editorIsOpen"
         }
       ],
@@ -592,6 +631,81 @@
           "type": "boolean",
           "default": true,
           "description": "Blame: tint each annotation by the age of its change, recent changes warm and old ones cool."
+        },
+        "lanefold.links.hosts": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Code hosts Lanefold cannot tell by name, such as self-hosted servers, by the host name in remote URLs: `{ \"git.example.com\": \"gitlab\" }`. Where the web is elsewhere, give its address too: `{ \"git.example.com\": { \"type\": \"gitlab\", \"url\": \"https://gitlab.example.com\" } }`. GitHub, GitLab, Bitbucket, Azure DevOps, Codeberg and Gitea are known, and so are servers named after them (`github.example.com`).",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "github",
+                  "gitlab",
+                  "gitea",
+                  "bitbucket",
+                  "bitbucketServer",
+                  "azure"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "github",
+                      "gitlab",
+                      "gitea",
+                      "bitbucket",
+                      "bitbucketServer",
+                      "azure"
+                    ],
+                    "description": "The kind of server: GitHub Enterprise is github, Forgejo is gitea, Bitbucket Data Center is bitbucketServer, Azure DevOps Server is azure."
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "Its web address, when that is not https:// and the host name, e.g. https://example.com/gitlab."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "What menus call it: Open on <name>."
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              }
+            ]
+          }
+        },
+        "lanefold.links.autolinks": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Issue references to link in commit messages, as GitHub's autolinks do: `[{ \"prefix\": \"PROJ-\", \"url\": \"https://jira.example.com/browse/PROJ-<num>\" }]`. `<num>` stands for the number; with `\"alphanumeric\": true` it takes letters too. The host's own references (`#12`) link without this.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "prefix": {
+                "type": "string",
+                "description": "What the reference starts with, e.g. PROJ-."
+              },
+              "url": {
+                "type": "string",
+                "description": "Where it links, with <num> for the number."
+              },
+              "alphanumeric": {
+                "type": "boolean",
+                "default": false,
+                "description": "The number may hold letters too."
+              }
+            },
+            "required": [
+              "prefix",
+              "url"
+            ]
+          }
         }
       }
     },
