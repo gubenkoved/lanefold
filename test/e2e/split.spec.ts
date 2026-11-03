@@ -1,9 +1,14 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect as baseExpect, test, type Page } from '@playwright/test';
 import { lowContrast } from './contrast';
 import { fixtureDir, harnessUrl } from './paths';
 import { copyDemo, git, graphRow, historyEditor, subjects } from './support';
+
+// Each step of a split (apply, commit a part, continue) runs a few dozen git commands, and a test
+// takes several: on a busy machine a step alone can take 8 seconds.
+test.describe.configure({ timeout: 90_000 });
+const expect = baseExpect.configure({ timeout: 20_000 });
 
 /** A small repository whose middle commit (by Bob) changes both ends of one file: two hunks. */
 function twoHunkRepo(): string {
