@@ -19,12 +19,22 @@ async function headings(page: Page): Promise<string[]> {
   return inScreenOrder(cells);
 }
 
-/** The cells' texts, in DOM order, once their left edges are seen to follow that order. */
+/**
+ * The cells' texts, in DOM order, once their left edges are seen to follow that order. All are
+ * read at once: as a resized graph settles, a cell can go between two reads of it.
+ */
 async function inScreenOrder(cells: Locator): Promise<string[]> {
-  const lefts: number[] = [];
-  for (const cell of await cells.all()) lefts.push((await cell.boundingBox())!.x);
+  // The test project has no DOM types: what is used of them, typed as far as needed.
+  type Cell = { getBoundingClientRect(): { left: number }; innerText: string };
+  const read = await cells.evaluateAll((elements) =>
+    (elements as unknown as Cell[]).map((cell) => ({
+      left: cell.getBoundingClientRect().left,
+      text: cell.innerText,
+    })),
+  );
+  const lefts = read.map((cell) => cell.left);
   expect(lefts).toEqual([...lefts].sort((a, b) => a - b));
-  return (await cells.allInnerTexts()).map((text) => text.trim()).filter(Boolean);
+  return read.map((cell) => cell.text.trim()).filter(Boolean);
 }
 
 async function dragHeading(page: Page, name: string, before: string): Promise<void> {
