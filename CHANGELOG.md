@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.0
+
+- Links to the code host: Lanefold reads which host each remote is on (GitHub, GitLab, Bitbucket
+  Cloud and Server, Azure DevOps, Gitea and Forgejo), from its URL as git uses it: `insteadOf`
+  rewrites apply and SSH host aliases are looked up. A link goes to a remote that has the commit,
+  `upstream` first (in a fork, the original repository).
+  - Pointing at a commit's hash in its details, or reaching it with <kbd>Tab</kbd>, offers the
+    commit there: Open on GitHub, Copy link, Copy hash. For a commit no remote has yet, it says so
+    instead.
+  - Menus open commits, the comparison of two commits, branches (where their upstream is), tags
+    and a commit's changed files on the host, and copy their links. The menu's footer shows the
+    address.
+  - Issue references in commit messages (`#12`, `GH-12`, `owner/repo#12`, GitLab's `!12`) and web
+    addresses are links. They read as the text around them until pointed at.
+  - In the editor, Copy Permalink and Open on Remote link the selected lines, or the cursor's, as
+    of the newest commit a remote has: edits since then shift them, and lines that changed are
+    pointed out. The editor's menu offers them where the file's repository is on a code host.
+  - The blame hover opens a line's commit on the host.
+  - New settings: `lanefold.links.hosts` names servers Lanefold cannot tell by name (a
+    self-hosted GitLab, say), with their web address where it differs, and
+    `lanefold.links.autolinks` links more references, as GitHub's autolinks do (`PROJ-12`).
+- After a commit much newer than the others, a refresh no longer hides the other branches for a
+  moment.
+
 ## 0.1.4
 
 - The branches pane has a checkbox for each branch, remote branch and tag: checked, its commits
