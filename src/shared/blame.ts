@@ -2,6 +2,7 @@
  * Blame data as the editors show it, plus the line mapping behind "Annotate Previous Revision".
  * Pure: parsed and computed in the extension host, unit-tested without git.
  */
+import { calendarDate, isoDate, relativeLong, relativeTime } from './time';
 
 export interface BlameCommit {
   readonly sha: string;
@@ -205,6 +206,107 @@ export function mapLineToOld(hunks: readonly Hunk[], line: number, oldLineCount?
   mapped ??= line - delta;
   const max = oldLineCount === undefined ? Infinity : Math.max(1, oldLineCount);
   return Math.min(max, Math.max(1, mapped));
+}
+
+/**
+ * How annotations name a commit's author: "Maneeshi Sharma" (full), "Maneeshi" (first),
+ * "Maneeshi S." (firstInitial), "M. Sharma" (initialLast), "MS" (initials), the name of their
+ * email address (email), or not at all (none).
+ */
+export type BlameAuthorStyle =
+  'full' | 'first' | 'firstInitial' | 'initialLast' | 'initials' | 'email' | 'none';
+/**
+ * How annotations date a commit: "3d ago" for the last week and the day before that (auto),
+ * "9 years ago" (relative), "Mar 16, 2017" (date), "2017-03-16" (iso), or not at all (none).
+ */
+export type BlameDateStyle = 'auto' | 'relative' | 'date' | 'iso' | 'none';
+
+export const BLAME_AUTHOR_STYLES: readonly BlameAuthorStyle[] = [
+  'full',
+  'first',
+  'firstInitial',
+  'initialLast',
+  'initials',
+  'email',
+  'none',
+];
+export const BLAME_DATE_STYLES: readonly BlameDateStyle[] = ['auto', 'relative', 'date', 'iso', 'none'];
+
+/** An author as annotations name them (see {@link BlameAuthorStyle}). */
+export function authorLabel(name: string, email: string, style: BlameAuthorStyle): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const first = words[0];
+  const last = words.length > 1 ? words[words.length - 1] : undefined;
+  // The first character, whatever its script (a surrogate pair stays whole).
+  const initial = (word: string) => Array.from(word)[0] ?? '';
+  const mailbox = email.slice(0, Math.max(0, email.indexOf('@'))) || email;
+  if (style === 'none') return '';
+  if (style === 'email') return mailbox || name.trim();
+  if (!first) return mailbox;
+  switch (style) {
+    case 'first':
+      return first;
+    case 'firstInitial':
+      return last ? `${first} ${initial(last)}.` : first;
+    case 'initialLast':
+      return last ? `${initial(first)}. ${last}` : first;
+    case 'initials':
+      return `${initial(first)}${last ? initial(last) : ''}`.toUpperCase();
+    default:
+      return words.join(' ');
+  }
+}
+
+/** When a commit was made, as annotations say it (see {@link BlameDateStyle}). */
+export function dateLabel(seconds: number, style: BlameDateStyle, nowMs = Date.now()): string {
+  switch (style) {
+    case 'none':
+      return '';
+    case 'relative':
+      return relativeLong(seconds, nowMs);
+    case 'date':
+      return calendarDate(seconds);
+    case 'iso':
+      return isoDate(seconds);
+    default:
+      return relativeTime(seconds, nowMs);
+  }
+}
+
+const NBSP = '\u00a0';
+
+/**
+ * Each commit's annotation, "Mar 4, 2024  Alice Archer": the date first, then the author, the
+ * authors lined up after the file's longest date so the column reads like a timeline. Lines
+ * not committed yet say so.
+ */
+export function annotationTexts(
+  commits: ReadonlyMap<string, BlameCommit>,
+  style: { readonly author: BlameAuthorStyle; readonly date: BlameDateStyle },
+  nowMs = Date.now(),
+): Map<string, string> {
+  const parts = new Map<string, readonly [date: string, author: string]>();
+  for (const commit of commits.values()) {
+    const date =
+      style.date === 'none'
+        ? ''
+        : commit.uncommitted
+          ? 'uncommitted'
+          : dateLabel(commit.authorTime, style.date, nowMs);
+    const author =
+      style.author === 'none'
+        ? ''
+        : commit.uncommitted
+          ? 'you'
+          : authorLabel(commit.author, commit.authorMail, style.author);
+    parts.set(commit.sha, [date, author]);
+  }
+  const column = Math.max(0, ...[...parts.values()].map(([date]) => date.length)) + 1;
+  const texts = new Map<string, string>();
+  for (const [sha, [date, author]] of parts) {
+    texts.set(sha, date && author ? `${date}${NBSP.repeat(column - date.length)}${author}` : date || author);
+  }
+  return texts;
 }
 
 /** Blocks of consecutive lines from the same commit (0-based start, length). */

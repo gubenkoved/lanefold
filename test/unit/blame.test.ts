@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  annotationTexts,
+  authorLabel,
   blameBlocks,
+  dateLabel,
   mapLineToOld,
   parseBlamePorcelain,
   parseHunks,
@@ -113,5 +116,45 @@ describe('blame', () => {
     expect(mapLineToOld(parseHunks('@@ -0,0 +1 @@\n+new'), 1)).toBe(1);
     expect(mapLineToOld(parseHunks('@@ -0,0 +1 @@\n+new'), 2)).toBe(1);
     expect(mapLineToOld([], 40, 10)).toBe(10);
+  });
+});
+
+describe('blame annotations', () => {
+  it('name authors in the style asked for', () => {
+    const name = (style: Parameters<typeof authorLabel>[2]) =>
+      authorLabel('Maneeshi  Kumari Sharma', 'msharma@example.com', style);
+    expect(name('full')).toBe('Maneeshi Kumari Sharma');
+    expect(name('first')).toBe('Maneeshi');
+    expect(name('firstInitial')).toBe('Maneeshi S.');
+    expect(name('initialLast')).toBe('M. Sharma');
+    expect(name('initials')).toBe('MS');
+    expect(name('email')).toBe('msharma');
+    expect(name('none')).toBe('');
+    // One word, another script, no name at all.
+    expect(authorLabel('Cher', 'cher@example.com', 'initialLast')).toBe('Cher');
+    expect(authorLabel('Ёжик туманов', 'e@example.com', 'initials')).toBe('ЁТ');
+    expect(authorLabel('', 'bot@ci.example', 'firstInitial')).toBe('bot');
+  });
+
+  it('date changes in the style asked for', () => {
+    const now = Date.UTC(2026, 10, 3, 12);
+    const time = Date.UTC(2017, 2, 16, 12) / 1000;
+    expect(dateLabel(time, 'iso', now)).toBe('2017-03-16');
+    expect(dateLabel(time, 'date', now)).toMatch(/2017/);
+    expect(dateLabel(time, 'relative', now)).toMatch(/9 years ago/);
+    expect(dateLabel(now / 1000 - 3 * 86_400, 'auto', now)).toBe('3d ago');
+    expect(dateLabel(time, 'none', now)).toBe('');
+  });
+
+  it('line the authors up after the longest date, and leave out what is not wanted', () => {
+    const { commits } = parseBlamePorcelain(PORCELAIN);
+    const now = 1_700_000_400 * 1000;
+    const texts = annotationTexts(commits, { author: 'first', date: 'auto' }, now);
+    // "uncommitted" is the longest date: every name starts one place after it.
+    expect(texts.get(Z)).toBe('uncommitted\u00a0you');
+    expect(texts.get(A)).toBe(`6m ago${'\u00a0'.repeat(6)}Alice`);
+    expect(texts.get(B)).toBe(`3m ago${'\u00a0'.repeat(6)}Bob`);
+    expect(annotationTexts(commits, { author: 'none', date: 'iso' }, now).get(B)).toMatch(/^2023-11-1\d$/);
+    expect(annotationTexts(commits, { author: 'initials', date: 'none' }, now).get(A)).toBe('AA');
   });
 });

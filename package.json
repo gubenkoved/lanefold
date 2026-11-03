@@ -538,6 +538,60 @@
           "type": "boolean",
           "default": false,
           "description": "Blame: follow lines moved or copied within a file to the commit that wrote them (git blame -M)."
+        },
+        "lanefold.blame.width": {
+          "type": "number",
+          "default": 28,
+          "minimum": 8,
+          "maximum": 120,
+          "description": "Blame: width of the annotation column, in characters."
+        },
+        "lanefold.blame.author": {
+          "type": "string",
+          "enum": [
+            "full",
+            "first",
+            "firstInitial",
+            "initialLast",
+            "initials",
+            "email",
+            "none"
+          ],
+          "enumDescriptions": [
+            "The whole name: Maneeshi Sharma.",
+            "The first name: Maneeshi.",
+            "The first name and the initial of the last: Maneeshi S.",
+            "The initial of the first name and the last name: M. Sharma.",
+            "The initials: MS.",
+            "The name of the email address (what precedes the @).",
+            "No name: annotations show dates only."
+          ],
+          "default": "full",
+          "description": "Blame: how annotations name the author of each line."
+        },
+        "lanefold.blame.date": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "relative",
+            "date",
+            "iso",
+            "none"
+          ],
+          "enumDescriptions": [
+            "The last week in words (3d ago), earlier changes by their day (Mar 16, 2017).",
+            "How long ago: 9 years ago.",
+            "The day: Mar 16, 2017.",
+            "The day as 2017-03-16.",
+            "No date: annotations show names only."
+          ],
+          "default": "auto",
+          "description": "Blame: how annotations date the change to each line."
+        },
+        "lanefold.blame.heat": {
+          "type": "boolean",
+          "default": true,
+          "description": "Blame: tint each annotation by the age of its change, recent changes warm and old ones cool."
         }
       }
     },

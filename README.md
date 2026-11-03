@@ -17,7 +17,8 @@ shows the git commands it will use, and every change it makes to the repository 
   diff editor.
 - Search by text, author (`@name`), hash (`#1a2b3c`), path (`file:`), message (`message:`) and
   date (`after:`, `before:`). Matches are highlighted, or the graph is filtered down to them.
-- Blame annotations with an age heat bar, and history for a file or a range of lines.
+- Blame annotations with an age heat bar (their width and how they name authors and dates are
+  settings), and history for a file or a range of lines.
 - The history of every open repository in one graph.
 
 ### Operations
@@ -117,6 +118,10 @@ editor, dropping a commit onto another squashes it (<kbd>Alt</kbd> for fixup).
 | `lanefold.avatars.gravatar`       | off           | Load author avatars from Gravatar instead of showing initials.                      |
 | `lanefold.blame.ignoreWhitespace` | off           | Blame with `-w`: whitespace-only changes do not count.                              |
 | `lanefold.blame.detectMoves`      | off           | Blame with `-M`: lines moved within a file keep their original author.              |
+| `lanefold.blame.width`            | 28            | Width of the blame annotations, in characters.                                      |
+| `lanefold.blame.author`           | `full`        | How annotations name authors: `full`, `first`, `firstInitial`, `initials`, `email`… |
+| `lanefold.blame.date`             | `auto`        | How annotations date changes: `auto`, `relative`, `date`, `iso` or `none`.          |
+| `lanefold.blame.heat`             | on            | Tint annotations by the age of the change.                                          |
 | `lanefold.git.path`               | none          | The git executable. By default, the one VS Code's Git extension uses, then `PATH`.  |
 
 ## Development

@@ -5,9 +5,17 @@ import { GitError } from '../../core/git/errors';
 import type { RepositoryRegistry } from '../../core/repo/registry';
 import type { Repository } from '../../core/repo/repository';
 import { short } from '../../core/util/wording';
-import { blameBlocks, type BlameCommit, type BlameResult } from '../../shared/blame';
+import {
+  annotationTexts,
+  BLAME_AUTHOR_STYLES,
+  BLAME_DATE_STYLES,
+  blameBlocks,
+  type BlameAuthorStyle,
+  type BlameDateStyle,
+  type BlameResult,
+} from '../../shared/blame';
 import { isObjectId } from '../../shared/oid';
-import { absoluteTime, relativeLong, relativeTime } from '../../shared/time';
+import { absoluteTime, relativeLong } from '../../shared/time';
 import { locateFile } from '../fileLocation';
 import { EMPTY_REVISION, parseRevisionUri, REVISION_SCHEME, revisionUri } from '../revisionFs';
 import { heatColors, heatScale, type HeatColors } from './heat';
@@ -33,8 +41,10 @@ interface Location {
   readonly line: number;
 }
 
-/** Width of the annotation column, in editor characters. */
+/** Width of the annotation column, in editor characters: by default, and the narrowest and widest. */
 const WIDTH = 28;
+const MIN_WIDTH = 8;
+const MAX_WIDTH = 120;
 /** Distinct shades of the age heat (each a decoration type, shared by every editor). */
 const HEAT_STEPS = 10;
 const NBSP = ' ';
@@ -64,12 +74,42 @@ function commandLink(command: string, args: unknown): string {
   return `command:${command}?${encodeURIComponent(JSON.stringify([args]))}`;
 }
 
+/** How annotations look: the `lanefold.blame` settings that need no new blame. */
+interface Display {
+  /** Width of the column, in editor characters. */
+  readonly width: number;
+  readonly author: BlameAuthorStyle;
+  readonly date: BlameDateStyle;
+  /** Tint each annotation by the age of its change. */
+  readonly heat: boolean;
+}
+
+function readDisplay(): Display {
+  const settings = vscode.workspace.getConfiguration('lanefold.blame');
+  const width = settings.get<unknown>('width');
+  const author = settings.get<unknown>('author');
+  const date = settings.get<unknown>('date');
+  return {
+    width:
+      typeof width === 'number' && Number.isFinite(width)
+        ? Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)))
+        : WIDTH,
+    author: BLAME_AUTHOR_STYLES.find((style) => style === author) ?? 'full',
+    date: BLAME_DATE_STYLES.find((style) => style === date) ?? 'auto',
+    heat: settings.get<unknown>('heat') !== false,
+  };
+}
+
+/** Settings that change what a blame says (the others only change how it looks). */
+const BLAME_SETTINGS = ['lanefold.blame.ignoreWhitespace', 'lanefold.blame.detectMoves'];
+
 /**
  * The annotation column's look as a fixed set of decoration types (per heat shade, for a block's
  * first line and the lines after it): editors then only get ranges, plus each block's text.
  */
 interface Styles {
   readonly theme: 'dark' | 'light';
+  readonly display: Display;
   readonly first: readonly vscode.TextEditorDecorationType[];
   readonly rest: readonly vscode.TextEditorDecorationType[];
   readonly uncommittedFirst: vscode.TextEditorDecorationType;
@@ -77,7 +117,7 @@ interface Styles {
   readonly all: readonly vscode.TextEditorDecorationType[];
 }
 
-function createStyles(theme: 'dark' | 'light'): Styles {
+function createStyles(theme: 'dark' | 'light', display: Display): Styles {
   const make = (colors: HeatColors, first: boolean, uncommitted: boolean) =>
     vscode.window.createTextEditorDecorationType({
       rangeBehavior: vscode.DecorationRangeBehavior.ClosedOpen,
@@ -91,7 +131,7 @@ function createStyles(theme: 'dark' | 'light'): Styles {
         textDecoration: [
           'none',
           'display: inline-block',
-          `width: ${WIDTH}ch`,
+          `width: ${display.width}ch`,
           'box-sizing: border-box',
           'padding: 0 1ch 0 0.8ch',
           'margin-right: 1.5ch',
@@ -107,7 +147,11 @@ function createStyles(theme: 'dark' | 'light'): Styles {
         ].join('; '),
       },
     });
-  const shades = Array.from({ length: HEAT_STEPS }, (_, step) => heatColors(step / (HEAT_STEPS - 1), theme));
+  // Without the heat, every annotation looks the same: a quiet bar, no tint.
+  const plain = { bar: 'var(--vscode-editorLineNumber-foreground)', background: 'transparent' };
+  const shades = Array.from({ length: HEAT_STEPS }, (_, step) =>
+    display.heat ? heatColors(step / (HEAT_STEPS - 1), theme) : plain,
+  );
   const uncommitted = { bar: 'var(--vscode-editorGutter-modifiedBackground)', background: 'transparent' };
   const first = shades.map((colors) => make(colors, true, false));
   const rest = shades.map((colors) => make(colors, false, false));
@@ -115,6 +159,7 @@ function createStyles(theme: 'dark' | 'light'): Styles {
   const uncommittedRest = make(uncommitted, false, true);
   return {
     theme,
+    display,
     first,
     rest,
     uncommittedFirst,
@@ -134,7 +179,7 @@ export class BlameController implements vscode.Disposable {
   private readonly enabled = new Map<string, vscode.Uri>();
   private readonly documents = new Map<string, DocumentBlame>();
   private readonly messages = new Map<string, string>();
-  private styles = createStyles(themeKind());
+  private styles = createStyles(themeKind(), readDisplay());
   /** What each editor shows (editors are new objects whenever they are shown again). */
   private rendered = new WeakMap<vscode.TextEditor, BlameResult | undefined>();
   private readonly status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 200);
@@ -180,11 +225,7 @@ export class BlameController implements vscode.Disposable {
       }),
       vscode.window.onDidChangeTextEditorSelection((event) => this.scheduleStatus(event.textEditor)),
       vscode.window.onDidChangeActiveColorTheme(() => {
-        if (themeKind() === this.styles.theme) return;
-        for (const type of this.styles.all) type.dispose();
-        this.styles = createStyles(themeKind());
-        this.rendered = new WeakMap();
-        for (const editor of vscode.window.visibleTextEditors) this.render(editor);
+        if (themeKind() !== this.styles.theme) this.restyle();
       }),
       vscode.workspace.onDidChangeTextDocument((event) => {
         // Saving flips the dirty flag with no change to the text.
@@ -193,8 +234,9 @@ export class BlameController implements vscode.Disposable {
       vscode.workspace.onDidSaveTextDocument((document) => this.reload(document)),
       vscode.workspace.onDidCloseTextDocument((document) => this.forget(document.uri)),
       vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration('lanefold.blame'))
+        if (BLAME_SETTINGS.some((setting) => event.affectsConfiguration(setting)))
           for (const doc of this.openDocuments()) this.reload(doc);
+        else if (event.affectsConfiguration('lanefold.blame')) this.restyle();
       }),
       registry.onDidChangeRepo(({ repo, kinds }) => {
         // A commit, checkout or reset changes what the working tree files' lines are blamed on.
@@ -335,6 +377,14 @@ export class BlameController implements vscode.Disposable {
 
   // ---- rendering ---------------------------------------------------------------------------
 
+  /** Builds the annotations' look again (theme or settings changed) and shows it everywhere. */
+  private restyle(): void {
+    for (const type of this.styles.all) type.dispose();
+    this.styles = createStyles(themeKind(), readDisplay());
+    this.rendered = new WeakMap();
+    for (const editor of vscode.window.visibleTextEditors) this.render(editor);
+  }
+
   /** Shows a document's annotations in an editor, unless it already shows them. */
   private render(editor: vscode.TextEditor): void {
     const id = key(editor.document.uri);
@@ -352,12 +402,14 @@ export class BlameController implements vscode.Disposable {
         [...result.commits.values()].filter((c) => !c.uncommitted).map((c) => c.authorTime),
       );
       const lineCount = editor.document.lineCount;
+      const texts = annotationTexts(result.commits, this.styles.display);
       for (const block of blameBlocks(result)) {
         const commit = result.commits.get(block.sha);
         const step = commit ? Math.round(heat(commit.authorTime) * (HEAT_STEPS - 1)) : 0;
         const first = commit?.uncommitted ? this.styles.uncommittedFirst : this.styles.first[step]!;
         const rest = commit?.uncommitted ? this.styles.uncommittedRest : this.styles.rest[step]!;
-        const text = commit ? annotationText(commit) : NBSP;
+        // An empty text would leave the line without its column.
+        const text = texts.get(block.sha) || NBSP;
         for (let i = 0; i < block.length && block.start + i < lineCount; i++) {
           const range = new vscode.Range(block.start + i, 0, block.start + i, 0);
           if (i === 0) add(first, { range, renderOptions: { before: { contentText: text } } });
@@ -614,12 +666,6 @@ export class BlameController implements vscode.Disposable {
     for (const state of this.documents.values()) state.loading?.abort();
     for (const disposable of this.disposables) disposable.dispose();
   }
-}
-
-/** "Mar 4, 2024  Alice Archer" — date first, aligned, so the column reads like a timeline. */
-function annotationText(commit: BlameCommit): string {
-  const date = commit.uncommitted ? 'uncommitted' : relativeTime(commit.authorTime);
-  return `${date}${NBSP.repeat(Math.max(1, 13 - date.length))}${commit.uncommitted ? 'you' : commit.author}`;
 }
 
 function escapeMarkdown(text: string): string {

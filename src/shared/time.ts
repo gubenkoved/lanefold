@@ -38,6 +38,29 @@ export function relativeTime(epochSeconds: number, nowMs = Date.now()): string {
   return label;
 }
 
+/** Calendar dates with their year, by day (see {@link calendarDate}). */
+const yearLabels = new Map<number, string>();
+
+/** The calendar day, with its year ("Mar 4, 2023"). */
+export function calendarDate(epochSeconds: number): string {
+  const date = new Date(epochSeconds * 1000);
+  const key = date.getFullYear() * 400 + date.getMonth() * 32 + date.getDate();
+  let label = yearLabels.get(key);
+  if (label === undefined) {
+    label = monthDayYear.format(date);
+    if (yearLabels.size > 5000) yearLabels.clear();
+    yearLabels.set(key, label);
+  }
+  return label;
+}
+
+/** The calendar day as "2023-03-04", in the local time zone. */
+export function isoDate(epochSeconds: number): string {
+  const date = new Date(epochSeconds * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export function absoluteTime(epochSeconds: number): string {
   return full.format(new Date(epochSeconds * 1000));
 }
