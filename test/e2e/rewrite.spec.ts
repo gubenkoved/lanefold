@@ -93,8 +93,8 @@ test('while the editor is open, git’s Undo waits: Ctrl+Z steps back the arrang
   const undo = page.getByRole('button', { name: /^Undo: Edit history of main/ });
   await expect(undo).toBeEnabled();
   // Let the graph's reload settle before using its menus (a right-click on a row that moves lands
-  // on another commit). It shows main's new history first, as main alone has recent commits, then
-  // the other branches' too: origin/main's “Improve README” is back.
+  // on another commit). Main alone has recent commits, so a slow reload shows main's new history
+  // first and the other branches' after: origin/main's “Improve README” is back.
   await expect(graphRow(page, 'Add dark mode toggle')).toContainText(head.slice(0, 8));
   await expect(graphRow(page, 'Improve README')).toBeVisible();
 
@@ -177,12 +177,17 @@ test('amends an earlier commit with the staged changes, from its menu or by drag
   expect(subjects(repo, 3)).toEqual(['Add dark mode toggle', 'Improve README', 'Update dependencies']);
   // Git moves the branch a moment before it puts the set-aside changes back.
   await expect.poll(() => git(repo, 'status', '--porcelain')).toBe('M src/dashboard.css');
+  // Undo once the graph shows the amended history (the history Undo puts back looks like the one
+  // before the amend, and origin/main keeps the old “Improve README” on screen meanwhile).
+  const amended = graphRow(page, git(repo, 'rev-parse', 'HEAD~1').slice(0, 8));
+  await expect(amended).toBeVisible();
   await page.getByRole('status').getByRole('button', { name: 'Undo' }).click();
   await expect.poll(() => git(repo, 'rev-parse', 'HEAD')).toBe(head);
   await expect.poll(() => git(repo, 'status', '--porcelain')).toBe('A  NOTES.md\n M src/dashboard.css');
 
   // Dragged onto a commit, the uncommitted changes offer the same (once the graph shows the
   // history Undo put back: a drop on a commit it replaced has nothing to amend).
+  await expect(amended).toBeHidden();
   await expect(graphRow(page, 'Improve README')).toContainText('1c1a40e3');
   const changes = graphRow(page, 'Uncommitted changes');
   await expect(changes).toContainText('1 staged');

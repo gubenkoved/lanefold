@@ -4,5 +4,5 @@
     "types": ["node"]
   },
   "include": ["src/core", "src/extension", "src/shared", "test", "dev", "*.ts"],
-  "exclude": ["node_modules", "dist", "out", "src/webview", "test/vscode"]
+  "exclude": ["node_modules", "dist", "out", "src/webview", "test/vscode", "test/webview"]
 }

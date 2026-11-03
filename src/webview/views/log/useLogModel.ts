@@ -63,9 +63,18 @@ export class LogLoader {
     }
     const needed = this.topRow() + 300;
     const covers = () => next.phase === 'ready' || next.phase === 'error' || next.topology.rowCount >= needed;
-    const timer = setTimeout(() => this.swap(next, animate), SWAP_TIMEOUT_MS);
+    const show = () => {
+      // A fast reload that missed old refs (after a commit far newer than the rest) would hide
+      // their branches until the complete one came: wait for that one instead.
+      if (next.missingRefs().length === 0) this.swap(next, animate);
+      else {
+        this.needsComplete = true;
+        this.load(animate);
+      }
+    };
+    const timer = setTimeout(show, SWAP_TIMEOUT_MS);
     const unsubscribe = next.subscribe(() => {
-      if (covers()) this.swap(next, animate);
+      if (covers()) show();
     });
     this.stopWaiting = () => {
       clearTimeout(timer);

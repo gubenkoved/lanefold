@@ -6,7 +6,8 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
-          include: ['test/unit/**/*.test.ts'],
+          // Tests of webview code that needs the browser's types live in test/webview (typechecked apart).
+          include: ['test/unit/**/*.test.ts', 'test/webview/**/*.test.ts'],
           environment: 'node',
         },
       },
