@@ -1,0 +1,126 @@
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { harnessUrl } from './paths';
+import { graphRow } from './support';
+
+// Wide enough for every column beside the branches and details panes.
+test.use({ viewport: { width: 1600, height: 560 } });
+
+async function open(page: Page): Promise<void> {
+  await page.goto(harnessUrl());
+  await expect(graphRow(page, 'Add dark mode toggle')).toBeVisible();
+}
+
+const grid = (page: Page) => page.getByRole('tabpanel').getByRole('grid');
+const heading = (page: Page, name: string) => grid(page).getByRole('columnheader', { name, exact: true });
+
+/** The headings on screen, in DOM order, after checking that it is their order on screen too. */
+async function headings(page: Page): Promise<string[]> {
+  const cells = grid(page).locator(':scope > [role="row"] > [role="columnheader"]:visible');
+  return inScreenOrder(cells);
+}
+
+/** The cells' texts, in DOM order, once their left edges are seen to follow that order. */
+async function inScreenOrder(cells: Locator): Promise<string[]> {
+  const lefts: number[] = [];
+  for (const cell of await cells.all()) lefts.push((await cell.boundingBox())!.x);
+  expect(lefts).toEqual([...lefts].sort((a, b) => a - b));
+  return (await cells.allInnerTexts()).map((text) => text.trim()).filter(Boolean);
+}
+
+async function dragHeading(page: Page, name: string, before: string): Promise<void> {
+  const from = (await heading(page, name).boundingBox())!;
+  const to = (await heading(page, before).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x - 10, from.y + from.height / 2, { steps: 4 });
+  await page.mouse.move(to.x + 8, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.up();
+}
+
+test('columns are switched off, moved from the menu, the keyboard or by dragging, in every graph', async ({
+  page,
+}) => {
+  await open(page);
+  expect(await headings(page)).toEqual(['COMMIT MESSAGE', 'AUTHOR', 'DATE', 'COMMIT']);
+
+  // Off from the headings' menu: the heading and the rows' cells go.
+  await heading(page, 'Author').click({ button: 'right' });
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Commit message' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await page.getByRole('menuitemcheckbox', { name: 'Author', checked: true }).click();
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'DATE', 'COMMIT']);
+  await expect(graphRow(page, 'Update dependencies').getByText('Bob Builder')).toBeHidden();
+
+  // Moved from the menu: the rows' cells follow, in the DOM too.
+  await heading(page, 'Date').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Move Date left' }).click();
+  await expect.poll(() => headings(page)).toEqual(['DATE', 'COMMIT MESSAGE', 'COMMIT']);
+  const cells = await inScreenOrder(graphRow(page, 'Update dependencies').getByRole('gridcell'));
+  expect(cells).toEqual([
+    expect.stringMatching(/2024/),
+    'Update dependencies',
+    expect.stringMatching(/^[0-9a-f]{8}$/),
+  ]);
+
+  // From the keyboard: Tab reaches the headings, the arrows move between them, Alt+arrows move one.
+  await grid(page).focus();
+  await page.keyboard.press('Tab');
+  await expect(heading(page, 'Commit message')).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(heading(page, 'Date')).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(heading(page, 'Commit message')).toBeFocused();
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'DATE', 'COMMIT']);
+  await expect(heading(page, 'Commit message')).toBeFocused();
+  // The menu from the keyboard, on the heading.
+  await page.keyboard.press('Shift+F10');
+  await expect(page.getByRole('menuitem', { name: 'Move Commit message right' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(heading(page, 'Commit message')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(grid(page)).toBeFocused();
+
+  // Dragged: the hash goes first.
+  await dragHeading(page, 'Commit', 'Commit message');
+  await expect.poll(() => headings(page)).toEqual(['COMMIT', 'COMMIT MESSAGE', 'DATE']);
+
+  // Every graph shows the same columns, and the view options switch them too.
+  await page.getByRole('button', { name: 'New view' }).click();
+  await page.getByRole('menuitem', { name: /Local branches/ }).click();
+  await expect(graphRow(page, 'Add dark mode toggle')).toBeVisible();
+  expect(await headings(page)).toEqual(['COMMIT', 'COMMIT MESSAGE', 'DATE']);
+  await page.getByRole('button', { name: 'View options' }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Author', checked: false }).click();
+  await expect.poll(() => headings(page)).toEqual(['COMMIT', 'COMMIT MESSAGE', 'DATE', 'AUTHOR']);
+
+  // Kept for next time.
+  await page.reload();
+  await expect(graphRow(page, 'Add dark mode toggle')).toBeVisible();
+  expect(await headings(page)).toEqual(['COMMIT', 'COMMIT MESSAGE', 'DATE', 'AUTHOR']);
+
+  // And back to the usual columns.
+  await heading(page, 'Date').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Reset columns' }).click();
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'AUTHOR', 'DATE', 'COMMIT']);
+});
+
+test('a narrow graph leaves out the hash and the author, and its menu says so', async ({ page }) => {
+  await page.setViewportSize({ width: 760, height: 520 });
+  await open(page);
+  expect(await headings(page)).toEqual(['COMMIT MESSAGE', 'DATE']);
+  await heading(page, 'Date').click({ button: 'right' });
+  const hash = page.getByRole('menuitemcheckbox', { name: 'Commit hash', checked: true });
+  await hash.hover();
+  await expect(page.getByText('Shown when the graph is wider')).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Wider, but not enough for the author beside the date: without the date, it fits.
+  await page.setViewportSize({ width: 1180, height: 520 });
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'DATE']);
+  await heading(page, 'Date').click({ button: 'right' });
+  await page.getByRole('menuitemcheckbox', { name: 'Date' }).click();
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'AUTHOR']);
+});

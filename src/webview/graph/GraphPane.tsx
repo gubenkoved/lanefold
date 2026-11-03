@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type { RefInfo } from '../../shared/models';
+import { openMenu } from '../components/Menu';
 import { useApp } from '../state/store';
 import { useAnimationLevel, usePalette } from '../state/theme';
+import { columnMenuEntries, setGraphColumns, useGraphColumns } from './columnMenus';
 import { GraphView, type DragItem, type EmptyNote, type Highlight, type RowMark } from './GraphView';
 import type { LogModel } from './logModel';
 
@@ -51,14 +53,17 @@ export function GraphPane({
   const settings = useApp((state) => state.settings);
   const palette = usePalette();
   const animations = useAnimationLevel();
+  // One choice of columns for every graph: changed in one, they all follow.
+  const columns = useGraphColumns((state) => state.columns);
   const options = useMemo(
     () => ({
       density: settings.density,
       curved: settings.graphStyle === 'curved',
       palette,
       animations,
+      columns,
     }),
-    [settings.density, settings.graphStyle, palette, animations],
+    [settings.density, settings.graphStyle, palette, animations, columns],
   );
 
   useLayoutEffect(() => {
@@ -74,6 +79,9 @@ export function GraphPane({
         onDrop: callbacksRef.current.onDrop
           ? (item, row, x, y) => callbacksRef.current.onDrop?.(item, row, x, y)
           : undefined,
+        onColumnsMenu: (column, anchor, context) =>
+          openMenu(anchor, columnMenuEntries(useGraphColumns.getState().columns, { column, ...context })),
+        onColumnsChange: setGraphColumns,
       },
       options,
     );

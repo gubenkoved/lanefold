@@ -11,6 +11,8 @@ shows the git commands it will use, and every change it makes to the repository 
 ### History
 
 - A commit graph that streams history from git and stays responsive with millions of commits.
+  Its author, date and hash columns can be switched off and moved: right-click or drag a column
+  heading.
 - Views as tabs: all branches, the current branch, local branches or the branches you choose;
   file, folder and line history; comparisons between two refs; stashes, the reflog and
   statistics.
@@ -102,6 +104,7 @@ on macOS) or run **Lanefold: Open** from the Command Palette. Every command is u
 | Graph          | <kbd>Ctrl</kbd>+<kbd>F</kbd> or <kbd>/</kbd> search, <kbd>F3</kbd> next match, <kbd>Ctrl</kbd>+<kbd>C</kbd> copy hashes, <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redo                   |
 | History editor | <kbd>P</kbd> pick, <kbd>R</kbd> reword, <kbd>E</kbd> edit, <kbd>I</kbd> split, <kbd>S</kbd> squash, <kbd>F</kbd> fixup, <kbd>D</kbd> drop, <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> move, <kbd>Ctrl</kbd>+<kbd>Enter</kbd> apply |
 | Branches       | <kbd>Space</kbd> show or hide in the view, <kbd>Enter</kbd> go to the commit, <kbd>F2</kbd> rename, <kbd>Delete</kbd> delete                                                                                                     |
+| Column heading | <kbd>←</kbd> <kbd>→</kbd> the next heading, <kbd>Alt</kbd>+<kbd>←</kbd> <kbd>→</kbd> move the column, <kbd>Shift</kbd>+<kbd>F10</kbd> menu, <kbd>↓</kbd> back to the commits                                                     |
 | Tabs           | <kbd>Alt</kbd>+<kbd>←</kbd> <kbd>→</kbd> move, <kbd>F2</kbd> rename, <kbd>Delete</kbd> close                                                                                                                                     |
 | Blame          | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>[</kbd> annotate the previous revision, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>,</kbd> back, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>.</kbd> forward                                                |
 

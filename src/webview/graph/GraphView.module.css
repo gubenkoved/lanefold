@@ -9,16 +9,13 @@
   contain: strict;
   --lf-row-h: 26px;
   --lf-col-graph: 48px;
-  --lf-col-author: 168px;
-  --lf-col-date: 104px;
-  --lf-col-sha: 84px;
+  /* The lanes, then the columns on screen in their order (set as they change, see columns.ts). */
+  --lf-cols: var(--lf-col-graph) minmax(0, 1fr) 168px 104px 84px;
 }
 
 .header {
   display: grid;
-  grid-template-columns: var(--lf-col-graph) minmax(0, 1fr) var(--lf-col-author) var(--lf-col-date) var(
-      --lf-col-sha
-    );
+  grid-template-columns: var(--lf-cols);
   align-items: center;
   height: 24px;
   flex: 0 0 auto;
@@ -36,6 +33,59 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* A column's heading (not the lanes'): it has a menu, and is dragged sideways to move. */
+.headerCell:not([data-column='graph']) {
+  align-self: stretch;
+  line-height: 23px;
+  transition:
+    background-color var(--lf-dur-1) var(--lf-ease-out),
+    color var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.headerCell:not([data-column='graph']):hover,
+.headerCell:focus-visible {
+  background: var(--lf-hover);
+  color: var(--lf-fg);
+}
+
+/* The heading being dragged rides above the others; a line shows where it would go. */
+.headerDragged {
+  position: relative;
+  z-index: 6;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-bg-muted);
+  box-shadow: var(--lf-shadow-2);
+  color: var(--lf-fg);
+  transition: none;
+}
+
+.columnsDragging,
+.columnsDragging .headerCell {
+  cursor: grabbing;
+}
+
+/* The heading under the dragged one is not pointed at: the line says where it goes. */
+.columnsDragging .headerCell:not(.headerDragged) {
+  background: transparent;
+}
+
+.columnDrop {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  z-index: 5;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--lf-focus);
+  pointer-events: none;
+  transition: transform var(--lf-dur-1) var(--lf-ease-out);
+}
+
+.columnDrop[hidden] {
+  display: none;
 }
 
 .body {
@@ -73,9 +123,7 @@
   right: 0;
   height: var(--lf-row-h);
   display: grid;
-  grid-template-columns: var(--lf-col-graph) minmax(0, 1fr) var(--lf-col-author) var(--lf-col-date) var(
-      --lf-col-sha
-    );
+  grid-template-columns: var(--lf-cols);
   align-items: center;
   contain: layout style;
   will-change: transform;
@@ -129,13 +177,14 @@
   text-overflow: ellipsis;
 }
 
-/* A dropped column keeps its (empty) grid track, so its cells must take no room at all. */
+/* A column switched off, or left out of a narrow graph, has no track: its cells take no place. */
 .root[data-no-author] .author,
 .root[data-no-author] .headerCell[data-column='author'],
+.root[data-no-date] .date,
+.root[data-no-date] .headerCell[data-column='date'],
 .root[data-no-sha] .sha,
 .root[data-no-sha] .headerCell[data-column='sha'] {
-  padding: 0;
-  visibility: hidden;
+  display: none;
 }
 
 .message {

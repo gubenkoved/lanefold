@@ -1,4 +1,17 @@
 import type { AnimationLevel, Density, RefInfo } from '../../shared/models';
+import {
+  COLUMN_HEADINGS,
+  COLUMN_IDS,
+  COLUMN_WIDTHS,
+  droppedColumns,
+  gridTemplate,
+  isColumnId,
+  moveColumn,
+  shiftColumn,
+  visibleColumns,
+  type ColumnId,
+  type GraphColumns,
+} from './columns';
 import { absoluteTime, initials, relativeTime, shortSha, stringHash } from './format';
 import type { LogModel, RowSource } from './logModel';
 import { recentRenames } from './renames';
@@ -19,6 +32,17 @@ export interface GraphViewCallbacks {
   onRefClick?(ref: RefInfo, event: MouseEvent): void;
   /** A branch/tag pill or the selected commits were dropped on a row. */
   onDrop?(item: DragItem, targetRow: number, clientX: number, clientY: number): void;
+  /**
+   * The column headings' menu, opened on a heading (`column`) or on the lanes' (undefined).
+   * `visible`: the columns on screen; `dropped`: those a narrow graph leaves out.
+   */
+  onColumnsMenu?(
+    column: ColumnId | undefined,
+    anchor: Element | { readonly x: number; readonly y: number },
+    context: { readonly visible: readonly ColumnId[]; readonly dropped: ReadonlySet<ColumnId> },
+  ): void;
+  /** The columns were rearranged here: a heading dragged, or moved from the keyboard. */
+  onColumnsChange?(columns: GraphColumns): void;
 }
 
 /** What can be dragged in the graph: a ref pill, the selected commits, or the uncommitted changes. */
@@ -47,6 +71,8 @@ export interface GraphViewOptions {
   readonly curved: boolean;
   readonly palette: Palette;
   readonly animations: AnimationLevel;
+  /** Which columns show, in what order (the person's choice; a narrow graph shows fewer). */
+  readonly columns: GraphColumns;
 }
 
 /** A status chip on a commit's row. */
@@ -90,6 +116,8 @@ interface Slot {
   readonly authorName: HTMLSpanElement;
   readonly date: HTMLDivElement;
   readonly sha: HTMLDivElement;
+  /** The cells of the columns after the lanes (reordered with the columns). */
+  readonly cells: Readonly<Record<ColumnId, HTMLDivElement>>;
   row: number;
   /** What the slot currently shows (it is refilled when any of these change). */
   shownSha: string;
@@ -127,6 +155,10 @@ const frameTimes = { samples: new Float32Array(2048), count: 0 };
  */
 export class GraphView {
   readonly root: HTMLDivElement;
+  private readonly header: HTMLDivElement;
+  private readonly headerCells: Readonly<Record<ColumnId, HTMLDivElement>>;
+  /** Where a dragged column heading would go: a line between two columns. */
+  private readonly columnDrop: HTMLDivElement;
   private readonly body: HTMLDivElement;
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
@@ -192,6 +224,15 @@ export class GraphView {
   /** Swallows the click that follows a drop on a pill. */
   private suppressClick = false;
   private paintedRows = false;
+  /** The columns on screen, in order, and those a narrow graph leaves out (see applyColumns). */
+  private visible: readonly ColumnId[] = [];
+  private dropped: ReadonlySet<ColumnId> = new Set();
+  /** The order the cells are in (the DOM follows the screen, for screen readers). */
+  private cellOrder = '';
+  /** The heading Tab reaches: the arrow keys move between them. */
+  private headerFocus: ColumnId = 'message';
+  /** A column heading being dragged sideways. */
+  private columnDrag: { readonly stop: () => void } | undefined;
 
   constructor(
     container: HTMLElement,
@@ -208,21 +249,29 @@ export class GraphView {
     this.root.setAttribute('aria-label', 'Commit graph');
     this.root.setAttribute('aria-multiselectable', 'true');
 
-    const header = el('div', styles.header!);
-    header.setAttribute('role', 'row');
-    for (const [label, cls] of [
-      ['', 'graph'],
-      ['Commit message', 'message'],
-      ['Author', 'author'],
-      ['Date', 'date'],
-      ['Commit', 'sha'],
-    ] as const) {
+    this.header = el('div', styles.header!);
+    this.header.setAttribute('role', 'row');
+    const heading = (column: ColumnId | 'graph') => {
       const cell = el('div', styles.headerCell!);
       cell.setAttribute('role', 'columnheader');
-      cell.dataset.column = cls;
-      cell.textContent = label;
-      header.append(cell);
-    }
+      cell.dataset.column = column;
+      if (column === 'graph') return cell;
+      cell.textContent = COLUMN_HEADINGS[column];
+      cell.title = 'Drag to move (Alt+←/→); right-click to choose the columns';
+      cell.tabIndex = -1;
+      return cell;
+    };
+    this.header.append(heading('graph'));
+    this.headerCells = {
+      message: heading('message'),
+      author: heading('author'),
+      date: heading('date'),
+      sha: heading('sha'),
+    };
+    this.header.append(...options.columns.order.map((id) => this.headerCells[id]));
+    this.setHeaderFocus('message');
+    this.columnDrop = el('div', styles.columnDrop!);
+    this.columnDrop.hidden = true;
 
     this.body = el('div', styles.body!);
     this.canvas = el('canvas', styles.canvas!);
@@ -251,7 +300,7 @@ export class GraphView {
       this.status,
       this.emptyNote,
     );
-    this.root.append(header, this.body);
+    this.root.append(this.header, this.body, this.columnDrop);
     container.append(this.root);
 
     this.applyDensity();
@@ -351,6 +400,7 @@ export class GraphView {
 
   setOptions(options: GraphViewOptions): void {
     const densityChanged = options.density !== this.options.density;
+    const columnsChanged = options.columns !== this.options.columns;
     this.options = options;
     if (densityChanged) {
       const topRow = this.scrollTop / this.rowHeight;
@@ -359,6 +409,7 @@ export class GraphView {
       this.applyDensity();
       this.scrollTop = this.scrollTarget = topRow * this.rowHeight;
     }
+    if (columnsChanged) this.applyColumns();
     this.updateColors();
     this.contentVersion++;
     this.markersKey = '';
@@ -480,6 +531,7 @@ export class GraphView {
     this.disposed = true;
     if (this.flashTimer) clearTimeout(this.flashTimer);
     this.drag?.stop();
+    this.columnDrag?.stop();
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
     this.unsubscribeModel?.();
@@ -510,12 +562,7 @@ export class GraphView {
     this.viewportHeight = rect.height;
     this.viewportWidth = rect.width;
     // Narrow panels drop the least important columns; messages keep about 300px.
-    const sha = this.viewportWidth >= 720;
-    const author = this.viewportWidth >= 640;
-    this.root.style.setProperty('--lf-col-sha', sha ? '84px' : '0px');
-    this.root.style.setProperty('--lf-col-author', author ? '168px' : '0px');
-    this.root.toggleAttribute('data-no-sha', !sha);
-    this.root.toggleAttribute('data-no-author', !author);
+    this.applyColumns();
     // Fewer, whole pills read better than many squeezed ones.
     const pillLimit = this.viewportWidth < 480 ? 2 : this.viewportWidth < 800 ? 3 : 4;
     if (pillLimit !== this.pillLimit) {
@@ -523,6 +570,42 @@ export class GraphView {
       this.contentVersion++;
     }
     this.invalidate();
+  }
+
+  /**
+   * Shows the columns switched on that the graph has room for, in the person's order: the grid's
+   * tracks, the cells that take no place, and the cells' order in the DOM (headings and rows),
+   * which follows the screen's for screen readers.
+   */
+  private applyColumns(): void {
+    const columns = this.options.columns;
+    this.dropped = droppedColumns(columns, this.viewportWidth);
+    const visible = visibleColumns(columns, this.dropped);
+    if (visible.join() !== this.visible.join()) {
+      this.visible = visible;
+      for (const id of COLUMN_IDS) this.root.toggleAttribute(`data-no-${id}`, !visible.includes(id));
+      this.root.style.setProperty('--lf-cols', gridTemplate(visible));
+      // Tab reaches a heading on screen.
+      if (!visible.includes(this.headerFocus)) this.setHeaderFocus(visible[0] ?? 'message');
+      // Ref pills are fitted to the message column's room.
+      this.contentVersion++;
+      this.invalidate();
+    }
+    const order = columns.order.join();
+    if (order === this.cellOrder) return;
+    this.cellOrder = order;
+    const focused = document.activeElement;
+    this.header.append(...columns.order.map((id) => this.headerCells[id]));
+    for (const slot of this.slots) slot.el.append(...columns.order.map((id) => slot.cells[id]));
+    // A heading moved from the keyboard lost focus as it moved: it keeps it.
+    if (focused instanceof HTMLElement && focused !== document.activeElement && this.header.contains(focused))
+      focused.focus({ preventScroll: true });
+  }
+
+  /** Makes a column's heading the one Tab reaches. */
+  private setHeaderFocus(id: ColumnId): void {
+    this.headerFocus = id;
+    for (const column of COLUMN_IDS) this.headerCells[column].tabIndex = column === id ? 0 : -1;
   }
 
   private onModelChange(): void {
@@ -769,7 +852,8 @@ export class GraphView {
       author.append(avatar, authorName);
       const date = el('div', `${styles.cell} ${styles.date}`);
       const sha = el('div', `${styles.cell} ${styles.sha}`);
-      row.append(graph, message, author, date, sha);
+      const cells = { message, author, date, sha };
+      row.append(graph, ...this.options.columns.order.map((id) => cells[id]));
       for (const cell of [graph, message, author, date, sha]) cell.setAttribute('role', 'gridcell');
       this.rowsLayer.append(row);
       this.slots.push({
@@ -781,6 +865,7 @@ export class GraphView {
         authorName,
         date,
         sha,
+        cells,
         row: -1,
         shownSha: '',
         shownMeta: false,
@@ -1064,11 +1149,8 @@ export class GraphView {
 
   /** Pixels the ref pills of a row may take (the message column caps them at 62%). */
   private refsBudget(): number {
-    const columns =
-      this.graphWidth +
-      (this.root.hasAttribute('data-no-author') ? 0 : 168) +
-      104 +
-      (this.root.hasAttribute('data-no-sha') ? 0 : 84);
+    let columns = this.graphWidth;
+    for (const id of this.visible) if (id !== 'message') columns += COLUMN_WIDTHS[id];
     return Math.max(60, (this.viewportWidth - columns - 24) * 0.62);
   }
 
@@ -1280,6 +1362,17 @@ export class GraphView {
 
     this.root.addEventListener('keydown', (event) => this.onKeyDown(event));
 
+    // Column headings: a menu of the columns, dragged sideways to move, and keys of their own.
+    this.header.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      const column = (event.target as HTMLElement).closest<HTMLElement>('[data-column]')?.dataset.column;
+      this.openColumnsMenu(isColumnId(column) ? column : undefined, { x: event.clientX, y: event.clientY });
+    });
+    // A click leaves focus where it was (the rows): Tab reaches the headings.
+    this.header.addEventListener('mousedown', (event) => event.preventDefault());
+    this.header.addEventListener('pointerdown', (event) => this.onHeaderPointerDown(event));
+    this.header.addEventListener('keydown', (event) => this.onHeaderKeyDown(event));
+
     this.thumb.addEventListener('pointerdown', (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -1314,6 +1407,135 @@ export class GraphView {
       const ratio = (event.clientY - rect.top) / rect.height;
       this.scrollTo(ratio * this.model.rowCount * this.rowHeight - this.viewportHeight / 2, true);
     });
+  }
+
+  private openColumnsMenu(column: ColumnId | undefined, anchor: Element | { x: number; y: number }): void {
+    this.setHover(-1);
+    this.callbacks.onColumnsMenu?.(column, anchor, { visible: this.visible, dropped: this.dropped });
+  }
+
+  /** Keys on a focused heading: arrows move between headings, Alt+arrows move the column. */
+  private onHeaderKeyDown(event: KeyboardEvent): void {
+    const cell = (event.target as HTMLElement).closest<HTMLElement>('[data-column]');
+    const column = cell?.dataset.column;
+    if (!cell || !isColumnId(column)) return;
+    const visible = this.visible;
+    const index = visible.indexOf(column);
+    const focusAt = (at: number) => {
+      const next = visible[Math.max(0, Math.min(visible.length - 1, at))];
+      if (!next) return;
+      this.setHeaderFocus(next);
+      this.headerCells[next].focus();
+    };
+    const horizontal = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+    if (horizontal && event.altKey) {
+      const next = shiftColumn(this.options.columns, column, event.key === 'ArrowLeft' ? -1 : 1, visible);
+      if (next) this.callbacks.onColumnsChange?.(next);
+    } else if (horizontal) focusAt(index + (event.key === 'ArrowLeft' ? -1 : 1));
+    else if (event.key === 'Home') focusAt(0);
+    else if (event.key === 'End') focusAt(visible.length - 1);
+    // Down to the rows again.
+    else if (event.key === 'ArrowDown' || event.key === 'Escape') this.focus();
+    else if (
+      event.key === 'Enter' ||
+      event.key === ' ' ||
+      event.key === 'ContextMenu' ||
+      (event.key === 'F10' && event.shiftKey)
+    )
+      this.openColumnsMenu(column, cell);
+    else return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  /** A press on a heading: dragged sideways, it moves its column where it is dropped. */
+  private onHeaderPointerDown(event: PointerEvent): void {
+    const cell = (event.target as HTMLElement).closest<HTMLElement>('[data-column]');
+    const column = cell?.dataset.column;
+    if (event.button !== 0 || !cell || !isColumnId(column) || !this.callbacks.onColumnsChange) return;
+    this.columnDrag?.stop();
+    const startX = event.clientX;
+    const pointerId = event.pointerId;
+    let active = false;
+    let bounds = { min: 0, max: 0 };
+    const move = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      if (!active) {
+        if (Math.abs(e.clientX - startX) < DRAG_THRESHOLD) return;
+        active = true;
+        // The heading follows the pointer between the lanes' heading and the header's end.
+        const header = this.header.getBoundingClientRect();
+        const rect = cell.getBoundingClientRect();
+        bounds = {
+          min: header.left + this.graphWidth - rect.left,
+          max: header.right - rect.right,
+        };
+        cell.classList.add(styles.headerDragged!);
+        this.root.classList.add(styles.columnsDragging!);
+        this.setHover(-1);
+      }
+      const dx = Math.max(bounds.min, Math.min(bounds.max, e.clientX - startX));
+      cell.style.transform = `translateX(${dx}px)`;
+      this.showColumnDrop(this.columnDropAt(column, e.clientX));
+    };
+    const up = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      const target = active ? this.columnDropAt(column, e.clientX) : undefined;
+      stop();
+      if (target) this.callbacks.onColumnsChange?.(moveColumn(this.options.columns, column, target.before));
+    };
+    const cancel = (e: PointerEvent) => {
+      if (e.pointerId === pointerId) stop();
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !active) return;
+      e.preventDefault();
+      e.stopPropagation();
+      stop();
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('keydown', key, true);
+      cell.classList.remove(styles.headerDragged!);
+      cell.style.transform = '';
+      this.root.classList.remove(styles.columnsDragging!);
+      this.showColumnDrop(undefined);
+      if (this.columnDrag === drag) this.columnDrag = undefined;
+    };
+    const drag = { stop };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('keydown', key, true);
+    this.columnDrag = drag;
+  }
+
+  /**
+   * Where a heading dropped at `clientX` takes its column: before the column on screen whose
+   * middle is past that point (`before` undefined: to the end), and the line between the two
+   * (`x`, from the graph's left). Undefined when the column would stay where it is.
+   */
+  private columnDropAt(column: ColumnId, clientX: number): { before?: ColumnId; x: number } | undefined {
+    const others = this.visible.filter((other) => other !== column);
+    const last = others[others.length - 1];
+    if (!last) return undefined;
+    const before = others.find((other) => {
+      const rect = this.headerCells[other].getBoundingClientRect();
+      return clientX < rect.left + rect.width / 2;
+    });
+    const next = moveColumn(this.options.columns, column, before);
+    if (visibleColumns(next, this.dropped).join() === this.visible.join()) return undefined;
+    const edge = before
+      ? this.headerCells[before].getBoundingClientRect().left
+      : this.headerCells[last].getBoundingClientRect().right;
+    return { before, x: edge - this.root.getBoundingClientRect().left };
+  }
+
+  private showColumnDrop(target: { x: number } | undefined): void {
+    this.columnDrop.hidden = !target;
+    if (target) this.columnDrop.style.transform = `translateX(${Math.round(target.x)}px)`;
   }
 
   private rowFromEvent(event: Event): number {
@@ -1615,7 +1837,8 @@ export class GraphView {
 
   private onKeyDown(event: KeyboardEvent): void {
     const model = this.model;
-    if (!model || model.rowCount === 0) return;
+    // The headings have keys of their own (see onHeaderKeyDown).
+    if (!model || model.rowCount === 0 || this.header.contains(event.target as Node)) return;
     const pageRows = Math.max(1, Math.floor(this.viewportHeight / this.rowHeight) - 1);
     const move = (row: number) => {
       const target = Math.max(0, Math.min(model.rowCount - 1, row));

@@ -5,6 +5,7 @@ import { IconButton } from '../../components/IconButton';
 import { openMenu, type MenuEntry } from '../../components/Menu';
 import { openPicker } from '../../components/Picker';
 import { SCOPE_ICONS } from '../../components/TabStrip';
+import { columnToggleEntries, useGraphColumns } from '../../graph/columnMenus';
 import type { LogModel } from '../../graph/logModel';
 import { useApp } from '../../state/store';
 import { scopeTitle, type TabModel } from '../../state/tabs';
@@ -353,6 +354,12 @@ export function LogToolbar({
         checked: !!view.noMerges,
         onSelect: () => set({ noMerges: !view.noMerges }),
       },
+      // The same in every view; the headings' own menu also moves them.
+      { kind: 'separator' },
+      { kind: 'header', label: 'Columns' },
+      ...columnToggleEntries(useGraphColumns.getState().columns, {
+        hint: 'In every view; drag a column heading to move it',
+      }),
     ]);
   };
 
