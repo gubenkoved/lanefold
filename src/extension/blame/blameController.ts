@@ -85,7 +85,6 @@ function createStyles(theme: 'dark' | 'light'): Styles {
         // A block's first line gets its text per line; the others are blank.
         contentText: first ? undefined : NBSP,
         color: new vscode.ThemeColor(first ? 'editorCodeLens.foreground' : 'editorLineNumber.foreground'),
-        backgroundColor: colors.background,
         // Otherwise the annotation takes the style of the line's first token (italic keywords).
         fontStyle: uncommitted ? 'italic' : 'normal',
         fontWeight: 'normal',
@@ -97,6 +96,10 @@ function createStyles(theme: 'dark' | 'light'): Styles {
           'padding: 0 1ch 0 0.8ch',
           'margin-right: 1.5ch',
           `border-left: 3px ${uncommitted ? 'dotted' : 'solid'} ${colors.bar}`,
+          // The tint over the editor's own background: opaque, so nothing VS Code draws under
+          // the text shows through (an empty line's indent guide is placed as if the
+          // annotation were not there).
+          `background: linear-gradient(${colors.background}, ${colors.background}), var(--vscode-editor-background)`,
           'overflow: hidden',
           'text-overflow: ellipsis',
           'white-space: pre',
