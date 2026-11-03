@@ -14,12 +14,18 @@ export type ContributorSort = 'commits' | 'lines' | 'recent';
 export type HotspotGroup = 'files' | 'folders';
 /** What the activity chart shows per period. */
 export type ActivityMeasure = 'commits' | 'lines';
+/**
+ * Whose changed lines are counted: the scope's newest commits (as many as the host's limit, the
+ * quick default), or every commit of the scope (slow on a long history).
+ */
+export type LineCounting = 'latest' | 'all';
 
 export const STATS_SCOPES: readonly StatsScope[] = ['head', 'all'];
 export const STATS_RANGES: readonly StatsRange[] = ['all', '12m', '3m', '30d'];
 export const CONTRIBUTOR_SORTS: readonly ContributorSort[] = ['commits', 'lines', 'recent'];
 export const HOTSPOT_GROUPS: readonly HotspotGroup[] = ['files', 'folders'];
 export const ACTIVITY_MEASURES: readonly ActivityMeasure[] = ['commits', 'lines'];
+export const LINE_COUNTINGS: readonly LineCounting[] = ['latest', 'all'];
 
 /** The longest author filter accepted: a name, or an email in angle brackets. */
 export const MAX_AUTHOR_LENGTH = 256;
@@ -33,6 +39,7 @@ export interface StatsConfig {
   readonly sort: ContributorSort;
   readonly hotspots: HotspotGroup;
   readonly activity: ActivityMeasure;
+  readonly lines: LineCounting;
 }
 
 export const DEFAULT_STATS_CONFIG: StatsConfig = {
@@ -41,6 +48,7 @@ export const DEFAULT_STATS_CONFIG: StatsConfig = {
   sort: 'commits',
   hotspots: 'files',
   activity: 'commits',
+  lines: 'latest',
 };
 
 export function isOneOf<T extends string>(values: readonly T[], value: unknown): value is T {
@@ -64,7 +72,7 @@ export function isAuthorFilter(value: unknown): value is string {
  */
 export function isStatsConfig(value: unknown): value is Partial<StatsConfig> {
   if (!value || typeof value !== 'object') return false;
-  const { scope, range, author, sort, hotspots, activity } = value as Record<string, unknown>;
+  const { scope, range, author, sort, hotspots, activity, lines } = value as Record<string, unknown>;
   const optional = <T extends string>(values: readonly T[], field: unknown) =>
     field === undefined || isOneOf(values, field);
   return (
@@ -73,6 +81,7 @@ export function isStatsConfig(value: unknown): value is Partial<StatsConfig> {
     optional(CONTRIBUTOR_SORTS, sort) &&
     optional(HOTSPOT_GROUPS, hotspots) &&
     optional(ACTIVITY_MEASURES, activity) &&
+    optional(LINE_COUNTINGS, lines) &&
     (author === undefined || isAuthorFilter(author))
   );
 }
@@ -90,6 +99,8 @@ export interface StatsQuery {
   readonly author?: string;
   readonly sort: ContributorSort;
   readonly hotspots: HotspotGroup;
+  /** Lines come from the scope's newest commits (the default), or from all of them. */
+  readonly lines?: LineCounting;
   /** How many contributors and hotspots to list (all of them are counted). */
   readonly contributors: number;
   readonly files: number;
@@ -154,8 +165,15 @@ export interface Contributor {
   readonly commits: number;
   /** Their share of all the commits (0 to 1). */
   readonly share: number;
+  /** Lines added and removed by their commits whose lines are counted (`counted`). */
   readonly added: number;
   readonly removed: number;
+  /** Their commits that change lines (merges aside: they have none of their own). */
+  readonly countable: number;
+  /** Of those, the ones whose changed lines are counted (none: their lines are unknown). */
+  readonly counted: number;
+  /** Of those, the ones whose lines are still to come (the rest are older than those counted). */
+  readonly counting: number;
   /** Author times of their first and last commit. */
   readonly first: number;
   readonly last: number;
@@ -187,8 +205,12 @@ export interface LineCoverage {
   readonly counted: number;
   /** Commits (merges aside) shown. */
   readonly total: number;
-  /** The newest commits of the scope counted at most. */
+  /** The newest commits of the scope counted at most, unless `all`. */
   readonly limit: number;
+  /** Every commit of the scope is counted (see {@link LineCounting}), however many. */
+  readonly all: boolean;
+  /** The scope's commits (merges aside), all time and every author: what `all` counts. */
+  readonly scopeTotal: number;
   /** The scope's lines are still being counted. */
   readonly pending: boolean;
 }
@@ -241,6 +263,16 @@ export interface LanguageStats {
   readonly languages: readonly LanguageShare[];
   readonly files: number;
   readonly bytes: number;
+}
+
+const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumSignificantDigits: 3 });
+
+/**
+ * A count for a narrow column: as it is below `from` ("9,876"), shortened from there on ("12.3K",
+ * "295K", "6.23M"). Whoever shows it says the exact number too (a title, a label).
+ */
+export function shortCount(value: number, from = 10_000): string {
+  return Math.abs(value) < from ? value.toLocaleString() : compact.format(value);
 }
 
 function plural(count: number, unit: string): string {

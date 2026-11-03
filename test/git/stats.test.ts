@@ -122,7 +122,14 @@ describe('statistics (real git)', () => {
       first: 1704189600,
       last: Date.parse('2024-01-06T12:00:00Z') / 1000,
     });
-    expect(result.lines).toEqual({ counted: 5, total: 5, limit: 20_000, pending: false });
+    expect(result.lines).toEqual({
+      counted: 5,
+      total: 5,
+      limit: 20_000,
+      all: false,
+      scopeTotal: 5,
+      pending: false,
+    });
     expect(result.contributors.rows.map((row) => [row.name, row.commits, row.emails])).toEqual([
       ['Alice Archer', 3, ['alice@example.com']],
       ['Carol Chen', 2, ['carol@x.dev']],
@@ -213,9 +220,68 @@ describe('statistics (real git)', () => {
     expect(await stats.countLines('head')).toEqual({ counted: 2, target: 2, computed: 2 });
     const result = await stats.get(query('head'));
     // The newest two (merges aside): Alice's growth and Bob's notes.
-    expect(result.lines).toEqual({ counted: 2, total: 5, limit: 2, pending: false });
+    expect(result.lines).toEqual({
+      counted: 2,
+      total: 5,
+      limit: 2,
+      all: false,
+      scopeTotal: 5,
+      pending: false,
+    });
     expect(result.summary).toMatchObject({ added: 3, files: 2 });
     expect(progress).toContainEqual({ scope: 'head', phase: 'lines', done: 2, total: 2 });
+    // Carol's commits are older than the two: her lines are not known.
+    expect(result.contributors.rows.find((row) => row.name === 'Carol Chen')).toMatchObject({
+      countable: 2,
+      counted: 0,
+      counting: 0,
+    });
+  });
+
+  it('counts every commit’s lines when asked, past the limit, and goes back to the newest', async () => {
+    await history(test);
+    const progress: unknown[] = [];
+    const stats = new RepoStats(repo, { now: () => NOW, lineLimit: 2, onProgress: (p) => progress.push(p) });
+    expect(await stats.countLines('head')).toEqual({ counted: 2, target: 2, computed: 2 });
+    const latest = await stats.get(query('head'));
+    expect(latest.lines).toMatchObject({ counted: 2, total: 5, all: false, scopeTotal: 5 });
+
+    // Every commit: only the three not counted yet are read.
+    commands.length = 0;
+    expect(await stats.countLines('head', undefined, false, 'all')).toEqual({
+      counted: 5,
+      target: 5,
+      computed: 3,
+    });
+    expect(labelled('Statistics: count changed lines')).toHaveLength(1);
+    expect(progress.at(-1)).toEqual({ scope: 'head', phase: 'lines', done: 5, total: 5 });
+    const all = await stats.get(query('head', { lines: 'all' }));
+    expect(all.lines).toEqual({ counted: 5, total: 5, limit: 2, all: true, scopeTotal: 5, pending: false });
+    expect(all.summary).toMatchObject({ added: 8, files: 4 });
+    expect(all.contributors.rows.find((row) => row.name === 'Carol Chen')).toMatchObject({
+      countable: 2,
+      counted: 2,
+      added: 2,
+    });
+
+    // Back to the newest two: their numbers again, nothing read.
+    commands.length = 0;
+    expect(await stats.countLines('head')).toEqual({ counted: 2, target: 2, computed: 0 });
+    expect((await stats.get(query('head'))).lines).toMatchObject({ counted: 2, all: false });
+    expect(labelled('Statistics: count changed lines')).toEqual([]);
+  });
+
+  it('stops counting every commit when the view goes back to the newest ones', async () => {
+    await history(test);
+    const stats = new RepoStats(repo, { now: () => NOW, lineLimit: 2 });
+    const controller = new AbortController();
+    const all = stats.countLines('head', controller.signal, false, 'all');
+    // The newest two are counted on their own: not behind the job that counts everything.
+    const latest = stats.countLines('head');
+    controller.abort();
+    await expect(all).rejects.toThrow(/Cancelled/);
+    expect(await latest).toMatchObject({ counted: 2, target: 2 });
+    expect(stats.busy).toBe(false);
   });
 
   it('stops counting when nobody waits, and goes on where it stopped', async () => {
@@ -322,6 +388,20 @@ describe('statistics over RPC (real git)', () => {
     await expect(view.call('stats.get', { ...params, scope: 'everything' })).rejects.toThrow(/scope/);
     await expect(view.call('stats.get', { ...params, range: 'forever' })).rejects.toThrow(/range/);
     await expect(view.call('stats.get', { ...params, author: 'x'.repeat(1000) })).rejects.toThrow(/author/);
+    await expect(view.call('stats.get', { ...params, lines: 'most' })).rejects.toThrow(/line counting/);
+    expect(
+      await view.call('stats.countLines', { repoId: repo.id, scope: 'head', lines: 'all' }),
+    ).toMatchObject({
+      counted: 5,
+      target: 5,
+    });
+    expect((await view.call<StatsResult>('stats.get', { ...params, lines: 'all' })).lines).toMatchObject({
+      all: true,
+      counted: 5,
+    });
+    await expect(
+      view.call('stats.countLines', { repoId: repo.id, scope: 'head', lines: '--all' }),
+    ).rejects.toThrow(/line counting/);
     await expect(view.call('stats.get', { ...params, repoId: '/not/open' })).rejects.toThrow(
       /Unknown repository/,
     );

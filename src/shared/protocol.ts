@@ -27,7 +27,15 @@ import type {
 } from './models';
 import type { Operation, OperationPlan, OperationResult, OpState, UndoInfo } from './operations';
 import type { RewriteEntry, RewriteRange, RewriteSimulation } from './rewrite';
-import type { LanguageStats, LineCount, StatsProgress, StatsQuery, StatsResult, StatsScope } from './stats';
+import type {
+  LanguageStats,
+  LineCount,
+  LineCounting,
+  StatsProgress,
+  StatsQuery,
+  StatsResult,
+  StatsScope,
+} from './stats';
 
 export interface LogOpenResult {
   readonly logId: number;
@@ -291,10 +299,16 @@ export interface HostApi {
    */
   'stats.get'(params: StatsQuery): StatsResult;
   /**
-   * Counts the changed lines of the scope's newest commits not counted yet (`stats.progress`
-   * events say how far it is). Resolves when they are all counted; cancelling stops it.
+   * Counts the changed lines of the scope's newest commits (`lines: 'all'`: of all its commits)
+   * not counted yet (`stats.progress` events say how far it is). Resolves when they are all
+   * counted; cancelling stops it.
    */
-  'stats.countLines'(params: { repoId: string; scope: StatsScope; refresh?: boolean }): LineCount;
+  'stats.countLines'(params: {
+    repoId: string;
+    scope: StatsScope;
+    lines?: LineCounting;
+    refresh?: boolean;
+  }): LineCount;
   /** HEAD's files by language. */
   'stats.languages'(params: { repoId: string }): LanguageStats;
 }

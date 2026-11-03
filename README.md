@@ -74,7 +74,8 @@ shows the git commands it will use, and every change it makes to the repository 
 ### More
 
 - Statistics for a branch or the whole repository: activity over time, a weekday by hour punch
-  card, contributors, the most changed files and folders, languages and line counts.
+  card, contributors, the most changed files and folders, languages and line counts (for the
+  latest 20,000 commits, or for every commit).
 - Worktrees, submodules, visual bisect, patches, reflog recovery, clone and init.
 - The Git Console lists every git command Lanefold runs, with its output and timing.
 

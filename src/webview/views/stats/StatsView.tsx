@@ -2,11 +2,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   authorSearch,
   periodSearch,
+  shortCount,
   spanInWords,
   statsConfig,
   type ActivityBucket,
   type AuthorProfile,
   type LanguageStats,
+  type LineCounting,
+  type LineCoverage,
   type StatsConfig,
   type StatsProgress,
   type StatsQuery,
@@ -70,6 +73,8 @@ const MORE_CONTRIBUTORS = 25;
 const MORE_FILES = 20;
 /** Refreshes while lines are counted come at most this often (ms). */
 const REFRESH_EVERY = 1000;
+/** Line counts from this size on are shortened in the summary ("12.3M"): a tile is narrow. */
+const TILE_SHORT_FROM = 10_000_000;
 
 /** Views narrower than these drop to fewer columns. */
 const WIDE = 1180;
@@ -188,6 +193,12 @@ function AuthorHeader({ profile, onShowCommits }: { profile: AuthorProfile; onSh
   );
 }
 
+/** A summary tile's number: whole, or `short` ("12.3M", with the whole number for its title). */
+function tileCount(value: number, sign: string, short: boolean): { text: string; exact?: string } {
+  const exact = `${sign}${value.toLocaleString()}`;
+  return short ? { text: `${sign}${shortCount(value, 0)}`, exact } : { text: exact };
+}
+
 function Summary({ result }: { result: StatsResult }) {
   const { summary, lines } = result;
   const partial = lines.counted < lines.total;
@@ -203,6 +214,11 @@ function Summary({ result }: { result: StatsResult }) {
       ? Math.round((Date.UTC(...ymd(summary.last)) - Date.UTC(...ymd(summary.first))) / 86_400_000) + 1
       : 0;
   const net = summary.added - summary.removed;
+  // Lines added and removed shorten together: side by side, they read alike.
+  const short = Math.max(summary.added, summary.removed) >= TILE_SHORT_FROM;
+  const added = tileCount(summary.added, '+', short);
+  const removed = tileCount(summary.removed, '−', short);
+  const netText = tileCount(Math.abs(net), net >= 0 ? '+' : '−', short).text;
   return (
     <dl className={styles.tiles}>
       <Tile
@@ -221,13 +237,15 @@ function Summary({ result }: { result: StatsResult }) {
       )}
       <Tile
         label="Lines added"
-        value={waiting ? '—' : <span className={styles.plus}>+{summary.added.toLocaleString()}</span>}
+        value={waiting ? '—' : <span className={styles.plus}>{added.text}</span>}
         detail={counted}
+        title={added.exact}
       />
       <Tile
         label="Lines removed"
-        value={waiting ? '—' : <span className={styles.minus}>−{summary.removed.toLocaleString()}</span>}
-        detail={waiting ? counted : `net ${net >= 0 ? '+' : '−'}${Math.abs(net).toLocaleString()}`}
+        value={waiting ? '—' : <span className={styles.minus}>{removed.text}</span>}
+        detail={waiting ? counted : `net ${netText}`}
+        title={removed.exact}
       />
       <Tile
         label="Files changed"
@@ -284,6 +302,49 @@ function progressText(
   return undefined;
 }
 
+/**
+ * What the line counts cover, when they are not of every commit shown: still being counted, or
+ * of the newest commits only. It offers to count every commit of the scope, and while that runs,
+ * to go back to the newest ones.
+ */
+function LinesNotice({ lines, onCount }: { lines: LineCoverage; onCount: (lines: LineCounting) => void }) {
+  const latest = lines.limit.toLocaleString();
+  const countAll =
+    !lines.all && lines.scopeTotal > lines.limit ? (
+      <ActionButton
+        icon="history"
+        label={`Count all ${lines.scopeTotal.toLocaleString()}`}
+        title={`Count the changed lines of all ${plural(lines.scopeTotal, 'commit')} (merges aside), not only the latest ${latest}. A long history takes a while.`}
+        onClick={() => onCount('all')}
+      />
+    ) : null;
+  let text: string;
+  let action = countAll;
+  if (lines.pending && lines.all) {
+    text = 'Counting the lines of every commit, the newest first: the numbers fill in as they come.';
+    action = (
+      <ActionButton
+        icon="debug-stop"
+        label={`Latest ${latest} only`}
+        title={`Stop counting: lines of the latest ${latest} commits only`}
+        onClick={() => onCount('latest')}
+      />
+    );
+  } else if (lines.pending)
+    text = 'Counting the lines each commit changed, the newest first: the numbers fill in as they come.';
+  else if (lines.counted === 0)
+    text = `Lines are counted for the latest ${plural(lines.limit, 'commit')} (merges aside): these are older.`;
+  else
+    text = `Lines counted for the latest ${lines.counted.toLocaleString()} of ${plural(lines.total, 'commit')} (merges aside).`;
+  return (
+    <p className={styles.notice}>
+      <Icon name="info" />
+      <span className={styles.noticeText}>{text}</span>
+      {action}
+    </p>
+  );
+}
+
 export interface StatsViewProps {
   readonly tab: TabModel;
   readonly repoId: string;
@@ -323,6 +384,7 @@ export function StatsView({ tab, repoId, active }: StatsViewProps) {
     author: config.author,
     sort: config.sort,
     hotspots: config.hotspots,
+    lines: config.lines,
     contributors: limits.contributors,
     files: limits.files,
     timeZone,
@@ -330,8 +392,14 @@ export function StatsView({ tab, repoId, active }: StatsViewProps) {
   // What the numbers are of: while another selection loads, the last one's numbers are dimmed.
   const selection = JSON.stringify([config.scope, config.range, config.author, version]);
   // Lines are counted while the tab is in front; leaving it (or another scope) stops that.
-  const counting = useQuery(active ? JSON.stringify([repoId, config.scope, version]) : undefined, (signal) =>
-    host.rpc.call('stats.countLines', { repoId, scope: config.scope, refresh: true }, { signal }),
+  const counting = useQuery(
+    active ? JSON.stringify([repoId, config.scope, config.lines, version]) : undefined,
+    (signal) =>
+      host.rpc.call(
+        'stats.countLines',
+        { repoId, scope: config.scope, lines: config.lines, refresh: true },
+        { signal },
+      ),
   );
   // The refs are read again when the repository changed since the last request, only then.
   const askedAt = useRef<number | undefined>(undefined);
@@ -507,12 +575,7 @@ export function StatsView({ tab, repoId, active }: StatsViewProps) {
         {lines.pending && counting.error ? (
           <ErrorLine error={`Changed lines could not be counted: ${counting.error}`} />
         ) : lines.counted < lines.total ? (
-          <p className={styles.notice}>
-            <Icon name="info" />
-            {lines.pending
-              ? 'Counting the lines each commit changed, the newest first: the numbers fill in as they come.'
-              : `Lines counted for the latest ${lines.counted.toLocaleString()} of ${plural(lines.total, 'commit')} (merges aside).`}
-          </p>
+          <LinesNotice lines={lines} onCount={(next) => update({ lines: next })} />
         ) : null}
         <Section
           title="Activity"
@@ -566,6 +629,7 @@ export function StatsView({ tab, repoId, active }: StatsViewProps) {
               rows={data.contributors.rows}
               total={data.contributors.total}
               author={config.author}
+              lines={lines}
               onPick={(contributor) => update({ author: contributor.author })}
               onMore={() => setLimits({ ...limits, contributors: limits.contributors + MORE_CONTRIBUTORS })}
             />

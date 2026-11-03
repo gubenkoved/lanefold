@@ -11,9 +11,16 @@ import {
 } from '../../src/core/stats/calendar';
 import { languageOf, parseTree, summarizeLanguages } from '../../src/core/stats/languages';
 import { parseRawDate, StatsLogParser, type LogRecord } from '../../src/core/stats/parse';
-import { checkStatsQuery, checkStatsScope } from '../../src/core/stats/repoStats';
+import { checkLineCounting, checkStatsQuery, checkStatsScope } from '../../src/core/stats/repoStats';
 import { CommitStore, LineStore, personKey } from '../../src/core/stats/store';
-import { authorSearch, isStatsConfig, periodSearch, spanInWords, statsConfig } from '../../src/shared/stats';
+import {
+  authorSearch,
+  isStatsConfig,
+  periodSearch,
+  shortCount,
+  spanInWords,
+  statsConfig,
+} from '../../src/shared/stats';
 
 const A = 'a'.repeat(40);
 const B = 'b'.repeat(40);
@@ -307,11 +314,15 @@ describe('statistics requests', () => {
       author: 'Carol Chen',
       sort: 'commits',
       hotspots: 'files',
+      lines: 'latest',
       contributors: 25,
       files: 1000,
       timeZone: 'Europe/Berlin',
       refresh: false,
     });
+    expect(checkStatsQuery({ ...valid, lines: 'all' }).lines).toBe('all');
+    expect(checkLineCounting(undefined)).toBe('latest');
+    expect(checkLineCounting('all')).toBe('all');
     expect(checkStatsQuery({ ...valid, refresh: true }).refresh).toBe(true);
     expect(checkStatsQuery({ ...valid, refresh: 'yes' }).refresh).toBe(false);
     expect(checkStatsQuery({ ...valid, contributors: -3 }).contributors).toBe(1);
@@ -328,6 +339,8 @@ describe('statistics requests', () => {
     expect(() => checkStatsQuery({ ...valid, author: 'x'.repeat(300) })).toThrow(/author/);
     expect(() => checkStatsQuery({ ...valid, author: 'a\nb' })).toThrow(/author/);
     expect(() => checkStatsQuery({ ...valid, author: 42 })).toThrow(/author/);
+    expect(() => checkStatsQuery({ ...valid, lines: 'some' })).toThrow(/line counting/);
+    expect(() => checkLineCounting(20_000)).toThrow(/line counting/);
     expect(() => checkStatsQuery(undefined)).toThrow(/scope/);
     expect(() => checkStatsScope('refs')).toThrow(/scope/);
   });
@@ -357,8 +370,10 @@ describe('statistics view helpers', () => {
 
   it('restores saved configs: valid fields kept, the rest defaulted', () => {
     expect(isStatsConfig({ scope: 'all', range: '30d', author: 'Carol Chen' })).toBe(true);
+    expect(isStatsConfig({ lines: 'all' })).toBe(true);
     expect(isStatsConfig({})).toBe(true);
     expect(isStatsConfig({ scope: 'local' })).toBe(false);
+    expect(isStatsConfig({ lines: 'every' })).toBe(false);
     expect(isStatsConfig({ author: '' })).toBe(false);
     expect(isStatsConfig(null)).toBe(false);
     expect(statsConfig({ range: '3m' })).toEqual({
@@ -367,6 +382,26 @@ describe('statistics view helpers', () => {
       sort: 'commits',
       hotspots: 'files',
       activity: 'commits',
+      lines: 'latest',
     });
+  });
+
+  it('shortens large counts for narrow columns', () => {
+    expect(shortCount(0)).toBe('0');
+    expect(shortCount(9_999)).toBe((9_999).toLocaleString());
+    // Compact from 10,000 on, three significant digits (the exact number goes in a title).
+    const compact = (value: number) =>
+      new Intl.NumberFormat(undefined, { notation: 'compact', maximumSignificantDigits: 3 }).format(value);
+    expect(shortCount(294_659)).toBe(compact(294_659));
+    expect(shortCount(6_231_593)).toBe(compact(6_231_593));
+    expect(shortCount(1_234_567, 10_000_000)).toBe((1_234_567).toLocaleString());
+    expect(shortCount(62_315_930, 10_000_000)).toBe(compact(62_315_930));
+    // In English: short enough for a column.
+    const english = new Intl.NumberFormat('en', { notation: 'compact', maximumSignificantDigits: 3 });
+    expect([294_659, 6_231_593, 63_134].map((value) => english.format(value))).toEqual([
+      '295K',
+      '6.23M',
+      '63.1K',
+    ]);
   });
 });

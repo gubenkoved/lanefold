@@ -141,6 +141,56 @@ test('ranges count recent commits only, and follow new ones', async ({ page }) =
   await expect(contributors(page).getByRole('option')).toHaveCount(5);
 });
 
+test('lists keep their columns whatever the numbers: large ones short, whole on hover', async ({ page }) => {
+  const repo = copyDemo();
+  // Erin writes a large file, then removes most of it: numbers far wider than anyone else's.
+  for (const [lines, message] of [
+    [150_000, 'Generate a large file'],
+    [10_000, 'Trim the large file'],
+  ] as const) {
+    writeFileSync(join(repo, 'generated.txt'), 'line\n'.repeat(lines));
+    git(repo, 'add', 'generated.txt');
+    git(
+      repo,
+      '-c',
+      'user.name=Erin Example',
+      '-c',
+      'user.email=erin@example.com',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '-qm',
+      message,
+      // The demo has other changes staged: they stay out of it.
+      '--',
+      'generated.txt',
+    );
+  }
+  await openStats(page, repo);
+  const erin = contributors(page).getByRole('option', { name: /^Erin Example/ });
+  await expect(erin).toHaveAccessibleName(/150,000 lines added, 140,000 removed/);
+  const added = erin.getByText('+150K');
+  await expect(added).toBeVisible();
+  await expect(added).toHaveAttribute('title', '+150,000 −140,000 lines');
+  await expect(erin.getByText('−140K')).toBeVisible();
+
+  // Every row's bar starts and ends where the others' do, under the heading's.
+  const bars = await contributors(page)
+    .getByRole('option')
+    .evaluateAll((rows) =>
+      rows.map((row) => {
+        const bar = row.children[2]!.getBoundingClientRect();
+        return `${Math.round(bar.left)}:${Math.round(bar.width)}`;
+      }),
+    );
+  expect(bars).toHaveLength(5);
+  expect(new Set(bars).size).toBe(1);
+  const heading = await contributors(page).evaluate(
+    (list) => list.previousElementSibling!.children[1]!.getBoundingClientRect().left,
+  );
+  expect(Math.round(heading)).toBe(Number(bars[0]!.split(':')[0]));
+});
+
 test('fits a narrow panel', async ({ page }) => {
   await page.setViewportSize({ width: 520, height: 800 });
   const view = await openStats(page);

@@ -5,10 +5,12 @@ import {
   HOTSPOT_GROUPS,
   isAuthorFilter,
   isOneOf,
+  LINE_COUNTINGS,
   STATS_RANGES,
   STATS_SCOPES,
   type LanguageStats,
   type LineCount,
+  type LineCounting,
   type StatsProgress,
   type StatsQuery,
   type StatsResult,
@@ -29,7 +31,10 @@ import { parseTree, summarizeLanguages } from './languages';
 import { StatsLogParser } from './parse';
 import { CommitStore, LineStore } from './store';
 
-/** Line counts are read for at most this many of a scope's newest commits (merges aside). */
+/**
+ * Line counts are read for at most this many of a scope's newest commits (merges aside), unless
+ * all of them are asked for.
+ */
 export const LINE_LIMIT = 20_000;
 
 /** The metadata read: hash, parents, mailmapped author name and email, `--date=raw` author date. */
@@ -132,7 +137,7 @@ class IdList {
 }
 
 export interface RepoStatsOptions {
-  /** The newest commits (merges aside) whose lines are counted. */
+  /** The newest commits (merges aside) whose lines are counted, unless all are asked for. */
   readonly lineLimit?: number;
   /** Long reads say how far they are. */
   readonly onProgress?: (progress: Omit<StatsProgress, 'repoId'>) => void;
@@ -152,8 +157,9 @@ export type CheckedQuery = Omit<StatsQuery, 'repoId'>;
 /**
  * The statistics of one repository. Commits are read once and kept (they never change): when
  * the refs move, only the commits new to a scope are read (`git log <tips> --not <old tips>`).
- * Line counts (`--numstat`, the slow part) are read for the newest commits of a scope only, in a
- * job of their own that reports progress and stops when nobody waits for it any more.
+ * Line counts (`--numstat`, the slow part) are read for the newest commits of a scope (or all of
+ * them, when asked), in a job of their own that reports progress and stops when nobody waits for
+ * it any more.
  */
 export class RepoStats {
   private readonly commits: CommitStore;
@@ -161,8 +167,14 @@ export class RepoStats {
   private readonly lineLimit: number;
   private readonly scopes = new Map<StatsScope, ScopeState>();
   private readonly updates = new Map<StatsScope, { tips: readonly string[]; task: SharedTask<ScopeState> }>();
-  private readonly counting = new Map<StatsScope, SharedTask<number>>();
-  private readonly prepared = new Map<StatsScope, { ids: Int32Array; zone: string; scope: PreparedScope }>();
+  /** Line counting jobs, by scope and window (see {@link window}). */
+  private readonly counting = new Map<string, SharedTask<number>>();
+  private readonly prepared = new Map<
+    StatsScope,
+    { ids: Int32Array; zone: string; window: number; scope: PreparedScope }
+  >();
+  /** The line window last asked for, per scope: what keeping line counts keeps. */
+  private readonly windows = new Map<StatsScope, number>();
   private readonly calendars = new Map<string, ZoneCalendar>();
   private readonly tipsCache = new Map<StatsScope, { at: number; value: ScopeTips }>();
   /** The last commit totals counted (the slow part of a request), with what they are for. */
@@ -193,11 +205,19 @@ export class RepoStats {
   async get(query: CheckedQuery, signal?: AbortSignal): Promise<StatsResult> {
     this.lastUsed = Date.now();
     if (query.refresh) this.tipsCache.delete(query.scope);
+    const window = this.window(query.scope, query.lines);
     const { state, head } = await this.scope(query.scope, signal);
     const calendar = this.calendar(query.timeZone);
-    const scope = this.prepare(query.scope, state, calendar);
+    const scope = this.prepare(query.scope, state, calendar, window);
     const now = this.options.now?.() ?? Date.now() / 1000;
-    const input = { commits: this.commits, lines: this.lines, scope, calendar, lineLimit: this.lineLimit };
+    const input = {
+      commits: this.commits,
+      lines: this.lines,
+      scope,
+      calendar,
+      lineLimit: this.lineLimit,
+      allLines: query.lines === 'all',
+    };
     // Counting every commit again is needless while only lines, order or rows change.
     const key = JSON.stringify([query.range, query.author ?? null, calendar.dayOf(now)]);
     let totals = this.totals.find((entry) => entry.scope === scope && entry.key === key)?.value;
@@ -210,28 +230,37 @@ export class RepoStats {
   }
 
   /**
-   * Reads the changed lines of the scope's newest commits that are not known yet (newest
-   * first), reporting progress. Resolves once they are all known; stops early (keeping what it
-   * read) when `signal` aborts and nobody else waits.
+   * Reads the changed lines of the scope's newest commits (`lines: 'all'`: of all its commits)
+   * that are not known yet, newest first, reporting progress. Resolves once they are all known;
+   * stops early (keeping what it read) when `signal` aborts and nobody else waits.
    */
-  async countLines(scope: StatsScope, signal?: AbortSignal, refresh = false): Promise<LineCount> {
+  async countLines(
+    scope: StatsScope,
+    signal?: AbortSignal,
+    refresh = false,
+    lines?: LineCounting,
+  ): Promise<LineCount> {
     this.lastUsed = Date.now();
     if (refresh) this.tipsCache.delete(scope);
+    const window = this.window(scope, lines);
+    // A job per window: going back to the newest commits leaves the job counting all of them,
+    // which stops once nobody waits for it.
+    const key = `${scope}:${window}`;
     let computed = 0;
     // Commits made meanwhile may need counting too: go again (a few times at most).
     for (let round = 0; ; round++) {
       const { state } = await this.scope(scope, signal);
-      const target = this.target(state);
+      const target = this.target(state, window);
       const missing = target.filter((id) => !this.lines.has(id));
       if (missing.length === 0 || round >= 3) {
         return { counted: target.length - missing.length, target: target.length, computed };
       }
-      let task = this.counting.get(scope);
+      let task = this.counting.get(key);
       if (!task || task.stopped) {
         const job = new SharedTask((jobSignal) => this.readLines(scope, missing, target.length, jobSignal));
-        this.counting.set(scope, job);
+        this.counting.set(key, job);
         const forget = () => {
-          if (this.counting.get(scope) === job) this.counting.delete(scope);
+          if (this.counting.get(key) === job) this.counting.delete(key);
         };
         job.promise.then(forget, forget);
         task = job;
@@ -260,10 +289,20 @@ export class RepoStats {
     return stats;
   }
 
-  /** The scope's newest commits whose lines are counted (merges aside). */
-  private target(state: ScopeState): number[] {
+  /**
+   * How many of a scope's newest commits have their lines counted (Infinity: all of them), as a
+   * request asks; remembered as the scope's window.
+   */
+  private window(scope: StatsScope, lines: LineCounting | undefined): number {
+    const window = lines === 'all' ? Infinity : this.lineLimit;
+    this.windows.set(scope, window);
+    return window;
+  }
+
+  /** The scope's newest commits whose lines are counted (merges aside), as many as `window`. */
+  private target(state: ScopeState, window: number): number[] {
     const target: number[] = [];
-    for (let i = 0; i < state.ids.length && target.length < this.lineLimit; i++) {
+    for (let i = 0; i < state.ids.length && target.length < window; i++) {
       const id = state.ids[i]!;
       if (!this.commits.isMerge(id)) target.push(id);
     }
@@ -281,11 +320,17 @@ export class RepoStats {
     return calendar;
   }
 
-  private prepare(name: StatsScope, state: ScopeState, calendar: ZoneCalendar): PreparedScope {
+  private prepare(
+    name: StatsScope,
+    state: ScopeState,
+    calendar: ZoneCalendar,
+    window: number,
+  ): PreparedScope {
     const cached = this.prepared.get(name);
-    if (cached && cached.ids === state.ids && cached.zone === calendar.timeZone) return cached.scope;
-    const scope = prepareScope(this.commits, state.ids, calendar, this.lineLimit);
-    this.prepared.set(name, { ids: state.ids, zone: calendar.timeZone, scope });
+    if (cached?.ids === state.ids && cached.zone === calendar.timeZone && cached.window === window)
+      return cached.scope;
+    const scope = prepareScope(this.commits, state.ids, calendar, window);
+    this.prepared.set(name, { ids: state.ids, zone: calendar.timeZone, window, scope });
     return scope;
   }
 
@@ -473,9 +518,11 @@ export class RepoStats {
     // A commit git said nothing about (it should not happen) is not asked for again.
     for (const id of missing) if (!this.lines.has(id)) this.lines.set(id, []);
     progress(true);
-    // Remember a few scopes' worth, not every commit ever counted.
+    // Remember a few scopes' worth (their windows), not every commit ever counted.
     const wanted = new Set<number>();
-    for (const state of this.scopes.values()) for (const id of this.target(state)) wanted.add(id);
+    for (const [scope, state] of this.scopes) {
+      for (const id of this.target(state, this.windows.get(scope) ?? this.lineLimit)) wanted.add(id);
+    }
     for (const id of missing) wanted.add(id);
     this.lines.trim(this.lineLimit * 3, (id) => wanted.has(id));
     return computed;
@@ -490,7 +537,7 @@ function clampCount(value: unknown, fallback: number): number {
 
 /** Validates `stats.get` parameters from a webview (never trusted). */
 export function checkStatsQuery(params: unknown): CheckedQuery {
-  const { scope, range, author, sort, hotspots, contributors, files, timeZone, refresh } = (params ??
+  const { scope, range, author, sort, hotspots, lines, contributors, files, timeZone, refresh } = (params ??
     {}) as Record<string, unknown>;
   if (!isOneOf(STATS_SCOPES, scope)) throw new Error(`Unknown statistics scope: ${String(scope)}`);
   if (!isOneOf(STATS_RANGES, range)) throw new Error(`Unknown statistics range: ${String(range)}`);
@@ -507,6 +554,7 @@ export function checkStatsQuery(params: unknown): CheckedQuery {
     author,
     sort,
     hotspots,
+    lines: checkLineCounting(lines),
     contributors: clampCount(contributors, 10),
     files: clampCount(files, 10),
     timeZone: zone,
@@ -518,6 +566,13 @@ export function checkStatsQuery(params: unknown): CheckedQuery {
 export function checkStatsScope(scope: unknown): StatsScope {
   if (!isOneOf(STATS_SCOPES, scope)) throw new Error(`Unknown statistics scope: ${String(scope)}`);
   return scope;
+}
+
+/** Validates whose lines a webview asks to count ('latest' when it does not say). */
+export function checkLineCounting(lines: unknown): LineCounting {
+  if (lines === undefined) return 'latest';
+  if (!isOneOf(LINE_COUNTINGS, lines)) throw new Error(`Unknown line counting: ${String(lines)}`);
+  return lines;
 }
 
 export interface StatsServiceOptions {

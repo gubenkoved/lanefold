@@ -1,5 +1,11 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import type { ActivityBucket, ActivityMeasure, ActivitySeries, LanguageStats } from '../../../shared/stats';
+import {
+  shortCount,
+  type ActivityBucket,
+  type ActivityMeasure,
+  type ActivitySeries,
+  type LanguageStats,
+} from '../../../shared/stats';
 import { useElementWidth } from '../log/LogView';
 import { axisText, byteSize, percent, periodText, plural, UNIT_NAMES, WEEKDAYS } from './statsTab';
 import styles from './StatsCharts.module.css';
@@ -108,17 +114,17 @@ export function ActivityChart({
             <>
               {/* An arm's end is labelled where it is not crowded against the baseline's. */}
               {addedScale > 0 && baseline >= LABEL_ROOM ? (
-                <span style={{ top: 0 }}>+{addedScale.toLocaleString()}</span>
+                <span style={{ top: 0 }}>+{shortCount(addedScale)}</span>
               ) : null}
               <span style={{ top: `${baseline * 100}%` }}>0</span>
               {removedScale > 0 && 1 - baseline >= LABEL_ROOM ? (
-                <span style={{ top: '100%' }}>−{removedScale.toLocaleString()}</span>
+                <span style={{ top: '100%' }}>−{shortCount(removedScale)}</span>
               ) : null}
             </>
           ) : (
             <>
-              <span style={{ top: 0 }}>{commitScale.toLocaleString()}</span>
-              {halfway ? <span style={{ top: '50%' }}>{(commitScale / 2).toLocaleString()}</span> : null}
+              <span style={{ top: 0 }}>{shortCount(commitScale)}</span>
+              {halfway ? <span style={{ top: '50%' }}>{shortCount(commitScale / 2)}</span> : null}
               <span style={{ top: '100%' }}>0</span>
             </>
           )}

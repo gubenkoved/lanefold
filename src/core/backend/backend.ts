@@ -30,7 +30,7 @@ import { RepoData } from '../repo/repoData';
 import type { Repository } from '../repo/repository';
 import { linkedRepositoryFolder, readSubmoduleConflicts, readSubmodules } from '../repo/submodules';
 import { readWorktrees } from '../repo/worktrees';
-import { checkStatsQuery, checkStatsScope, StatsService } from '../stats/repoStats';
+import { checkLineCounting, checkStatsQuery, checkStatsScope, StatsService } from '../stats/repoStats';
 import { DisposableStore, Emitter, type Disposable } from '../util/emitter';
 import { paths } from '../util/paths';
 import { checkCount, checkFilePaths, checkOneOf, checkRev } from './params';
@@ -547,8 +547,10 @@ export class Backend implements Disposable {
       'file.open': ({ repoId, path, rev }) => platform.openFile(this.repo(repoId), path, rev),
       'stats.get': (params, { signal }) =>
         this.stats.for(this.repo(params?.repoId)).get(checkStatsQuery(params), signal),
-      'stats.countLines': ({ repoId, scope, refresh }, { signal }) =>
-        this.stats.for(this.repo(repoId)).countLines(checkStatsScope(scope), signal, refresh === true),
+      'stats.countLines': ({ repoId, scope, lines, refresh }, { signal }) =>
+        this.stats
+          .for(this.repo(repoId))
+          .countLines(checkStatsScope(scope), signal, refresh === true, checkLineCounting(lines)),
       'stats.languages': ({ repoId }, { signal }) => this.stats.for(this.repo(repoId)).languages(signal),
     };
   }

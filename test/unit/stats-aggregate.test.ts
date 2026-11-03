@@ -108,7 +108,14 @@ describe('statistics aggregation', () => {
       // Lines per commit: 3, 3, 8, 10, 20.
       medianLines: 8,
     });
-    expect(result.lines).toEqual({ counted: 5, total: 5, limit: 100, pending: false });
+    expect(result.lines).toEqual({
+      counted: 5,
+      total: 5,
+      limit: 100,
+      all: false,
+      scopeTotal: 5,
+      pending: false,
+    });
     expect(result.activity.linesFrom).toBeUndefined();
   });
 
@@ -135,6 +142,10 @@ describe('statistics aggregation', () => {
       share: 0.5,
       added: 22,
       removed: 1,
+      // Her merge has no lines of its own.
+      countable: 2,
+      counted: 2,
+      counting: 0,
       first: at('2024-03-04T08:15:00Z'),
       last: at('2024-06-01T12:00:00Z'),
       activeDays: 3,
@@ -328,20 +339,75 @@ describe('statistics aggregation', () => {
 
   it('counts lines for the newest commits only, and says where counting stops', () => {
     const result = stats(HISTORY, {}, { lineLimit: 2 });
-    expect(result.lines).toEqual({ counted: 2, total: 5, limit: 2, pending: false });
+    expect(result.lines).toEqual({
+      counted: 2,
+      total: 5,
+      limit: 2,
+      all: false,
+      scopeTotal: 5,
+      pending: false,
+    });
     expect(result.summary).toMatchObject({ commits: 6, added: 15, removed: 3, files: 3 });
     // Lines are known from the week of the first commit not counted (April 29th) on.
     expect(result.activity.buckets[result.activity.linesFrom!]!.start).toBe('2024-04-29');
-    // Contributors' lines come from counted commits only.
-    expect(result.contributors.rows.find((row) => row.name === 'Alice Archer')).toMatchObject({
+    // Contributors' lines come from counted commits only, and say so.
+    const rows = new Map(result.contributors.rows.map((row) => [row.name, row]));
+    expect(rows.get('Alice Archer')).toMatchObject({
       added: 0,
       commits: 3,
+      countable: 2,
+      counted: 0,
+      counting: 0,
     });
+    expect(rows.get('Carol Chen')).toMatchObject({ added: 10, countable: 1, counted: 1, counting: 0 });
+    expect(rows.get('Dan Dubois')).toMatchObject({ countable: 1, counted: 0, counting: 0 });
+  });
+
+  it('counts every commit’s lines when the scope is prepared without a limit', () => {
+    const { commits, lines, ids } = build(HISTORY);
+    const scope = prepareScope(commits, ids, UTC, Infinity);
+    expect([scope.linesEnd, scope.nonMerges]).toEqual([6, 5]);
+    const result = aggregateStats(
+      { commits, lines, scope, calendar: UTC, lineLimit: 2, allLines: true },
+      { range: 'all', sort: 'commits', hotspots: 'files', contributors: 10, files: 10, now: NOW },
+    );
+    expect(result.lines).toEqual({
+      counted: 5,
+      total: 5,
+      limit: 2,
+      all: true,
+      scopeTotal: 5,
+      pending: false,
+    });
+    expect(result.summary).toMatchObject({ added: 40, removed: 4 });
+    // A window of two ends after the second commit that is not a merge.
+    expect(prepareScope(commits, ids, UTC, 2)).toMatchObject({ linesEnd: 3, nonMerges: 5 });
+  });
+
+  it('tells a contributor’s lines still to come from lines not counted at all', () => {
+    // Alice's newest commit is in the window, its lines not read yet.
+    const result = stats([{ author: ALICE, at: '2024-06-12T10:00:00Z' }, ...HISTORY], {}, { lineLimit: 3 });
+    const alice = result.contributors.rows.find((row) => row.name === 'Alice Archer');
+    expect(alice).toMatchObject({ commits: 4, countable: 3, counted: 0, counting: 1 });
+    // A contributor with merges only has nothing to count.
+    const merger = stats([
+      { author: 'Merge Bot <bot@x.dev>', at: '2024-06-12T10:00:00Z', merge: true },
+      ...HISTORY,
+    ]).contributors.rows.find((row) => row.name === 'Merge Bot');
+    expect(merger).toMatchObject({ commits: 1, countable: 0, counted: 0, counting: 0, added: 0 });
   });
 
   it('says when lines are still being counted', () => {
     const pending = stats([{ author: ALICE, at: '2024-06-12T10:00:00Z' }, ...HISTORY]);
-    expect(pending.lines).toEqual({ counted: 5, total: 6, limit: 100, pending: true });
+    expect(pending.lines).toEqual({
+      counted: 5,
+      total: 6,
+      limit: 100,
+      all: false,
+      scopeTotal: 6,
+      pending: true,
+    });
+    expect(pending.contributors.rows[0]).toMatchObject({ name: 'Alice Archer', counted: 2, counting: 1 });
     expect(pending.activity.buckets[pending.activity.linesFrom!]!.start).toBe('2024-06-10');
   });
 

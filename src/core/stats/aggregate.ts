@@ -38,9 +38,14 @@ export interface PreparedScope {
    * (the merges among them aside: they have no lines of their own).
    */
   readonly linesEnd: number;
+  /** The commits that are not merges: what counting every commit's lines covers. */
+  readonly nonMerges: number;
 }
 
-/** Orders a scope's commits by day (a counting sort: days are few) and marks its line window. */
+/**
+ * Orders a scope's commits by day (a counting sort: days are few) and marks its line window: the
+ * newest `lineLimit` commits that are not merges (Infinity: all of them).
+ */
 export function prepareScope(
   commits: CommitStore,
   ids: Int32Array,
@@ -67,11 +72,14 @@ export function prepareScope(
     for (let i = 0; i < n; i++) byDay[i] = i;
     byDay.sort((a, b) => days[a]! - days[b]!);
   }
-  let linesEnd = 0;
-  for (let counted = 0; linesEnd < n && counted < lineLimit; linesEnd++) {
-    if (!commits.isMerge(ids[linesEnd]!)) counted++;
+  let linesEnd = lineLimit > 0 ? n : 0;
+  let nonMerges = 0;
+  for (let i = 0; i < n; i++) {
+    if (commits.isMerge(ids[i]!)) continue;
+    // The window ends with the `lineLimit`th commit that is not a merge.
+    if (++nonMerges === lineLimit) linesEnd = i + 1;
   }
-  return { ids, days, byDay, linesEnd };
+  return { ids, days, byDay, linesEnd, nonMerges };
 }
 
 /** The first day of a range ending today (`today` included); -Infinity for all time. */
@@ -90,8 +98,10 @@ export interface AggregateInput {
   readonly lines: LineStore;
   readonly scope: PreparedScope;
   readonly calendar: DayCalendar;
-  /** The newest commits (merges aside) whose lines are counted at most. */
+  /** The newest commits (merges aside) whose lines are counted at most, unless `allLines`. */
   readonly lineLimit: number;
+  /** Every commit's lines are counted: the scope was prepared without a limit. */
+  readonly allLines?: boolean;
 }
 
 export interface AggregateQuery {
@@ -134,6 +144,8 @@ export interface CommitTotals {
   readonly last: number;
   /** Per person, in the range (whatever the author filter). */
   readonly personCommits: Int32Array;
+  /** Their commits that are not merges (the ones with lines to count). */
+  readonly personCountable: Int32Array;
   readonly personFirst: Float64Array;
   readonly personLast: Float64Array;
   /** The identity of their latest commit. */
@@ -174,6 +186,7 @@ export function countCommits(
 
   const people = commits.people.length;
   const personCommits = new Int32Array(people);
+  const personCountable = new Int32Array(people);
   const personFirst = new Float64Array(people).fill(Infinity);
   const personLast = new Float64Array(people).fill(-Infinity);
   const personLatest = new Int32Array(people).fill(-1);
@@ -199,8 +212,10 @@ export function countCommits(
     const person = commits.personOf(id);
     const time = commits.time[id]!;
     rangeCommits++;
+    const merge = commits.isMerge(id);
     if (person >= 0) {
       personCommits[person]! += 1;
+      if (!merge) personCountable[person]! += 1;
       if (time < personFirst[person]!) personFirst[person] = time;
       if (time >= personLast[person]!) {
         personLast[person] = time;
@@ -214,7 +229,7 @@ export function countCommits(
     if (author !== undefined && person !== author) continue;
 
     shownCommits++;
-    if (commits.isMerge(id)) merges++;
+    if (merge) merges++;
     if (person >= 0 && !shown[person]) {
       shown[person] = 1;
       contributors++;
@@ -254,6 +269,7 @@ export function countCommits(
     first,
     last,
     personCommits,
+    personCountable,
     personFirst,
     personLast,
     personLatest,
@@ -310,6 +326,8 @@ export function aggregateStats(
   const people = commits.people.length;
   const personAdded = new Float64Array(people);
   const personRemoved = new Float64Array(people);
+  const personCounted = new Int32Array(people);
+  const personCounting = new Int32Array(people);
   const periodAdded = new Float64Array(periods);
   const periodRemoved = new Float64Array(periods);
   const sizes: number[] = [];
@@ -340,17 +358,19 @@ export function aggregateStats(
   for (let position = 0; position < linesEnd; position++) {
     const id = ids[position]!;
     if (commits.isMerge(id)) continue;
-    const commitLines = lines.get(id);
-    if (!commitLines) {
-      missing++;
-      continue;
-    }
     const person = commits.personOf(id);
     const day = days[position]!;
     const inRange = day >= startDay;
+    const commitLines = lines.get(id);
+    if (!commitLines) {
+      missing++;
+      if (inRange && person >= 0) personCounting[person]! += 1;
+      continue;
+    }
     if (inRange && person >= 0) {
       personAdded[person]! += commitLines.added;
       personRemoved[person]! += commitLines.removed;
+      personCounted[person]! += 1;
     }
     const included = inRange && (author === undefined || person === author);
     if (included) {
@@ -442,7 +462,8 @@ export function aggregateStats(
   }));
 
   // ---- contributors -------------------------------------------------------------------------
-  const { personCommits, personFirst, personLast, personLatest, personDays, rangeCommits } = totals;
+  const { personCommits, personCountable, personFirst, personLast, personLatest, personDays, rangeCommits } =
+    totals;
   // People who first appeared after the totals were counted have no commits in them.
   const commitsOf = (person: number) => (person < personCommits.length ? personCommits[person]! : 0);
   const contributorRow = (person: number): Contributor => {
@@ -463,6 +484,9 @@ export function aggregateStats(
       share: rangeCommits > 0 ? commitsOf(person) / rangeCommits : 0,
       added: personAdded[person]!,
       removed: personRemoved[person]!,
+      countable: personCountable[person]!,
+      counted: personCounted[person]!,
+      counting: personCounting[person]!,
       first: personFirst[person]!,
       last: personLast[person]!,
       activeDays: personDays[person]!,
@@ -557,6 +581,13 @@ export function aggregateStats(
     author: profile,
     punchCard: Array.from(totals.punch),
     hotspots: { total: folders ? folderNames.length : files, rows: hotspots },
-    lines: { counted, total: nonMerges, limit: input.lineLimit, pending: missing > 0 },
+    lines: {
+      counted,
+      total: nonMerges,
+      limit: input.lineLimit,
+      all: input.allLines === true,
+      scopeTotal: scope.nonMerges,
+      pending: missing > 0,
+    },
   };
 }
