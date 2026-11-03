@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.1.4
+
+- The branches pane has a checkbox for each branch, remote branch and tag: checked, its commits
+  are in the view.
+  - In a view of all branches or of the local ones, unchecking a branch leaves it out (as hiding
+    it did). In a view of the current branch, checking another adds it: the current branch and
+    `main` together, say. A view of the local branches takes remote branches and tags the same way,
+    and a view of one branch (Show only this branch) takes more branches next to it.
+  - <kbd>Space</kbd> checks or unchecks the branch in focus. Choosing a branch the view does not
+    show offers to show it there.
+- New view → Several branches… opens a view of the branches and tags you check.
+- A commit's details list the branches and tags that contain it: the current branch and the
+  trunk first, then the other branches and the remote branches, and the tags, the oldest first
+  (the first release to have the commit). Choosing one goes to its commit.
+- The graph's columns can be switched off and on and moved: right-click a column heading, drag it
+  sideways, or View options → Columns. The choice applies to every graph and is kept.
+  - Column headings work from the keyboard: <kbd>Tab</kbd> reaches them, <kbd>←</kbd>
+    <kbd>→</kbd> go between them, <kbd>Alt</kbd>+<kbd>←</kbd> <kbd>→</kbd> moves a column and
+    <kbd>Shift</kbd>+<kbd>F10</kbd> opens their menu.
+  - A narrow graph still leaves out the hash, then the author, and finds room for one you keep
+    when you switch another off.
+- Statistics:
+  - Changed lines can be counted for every commit, not only the latest 20,000: Count all, in the
+    notice under the summary. The choice is kept with the tab; while it runs, Latest 20,000 only
+    goes back.
+  - The contributors and hotspots lists keep their columns lined up: every bar starts at the same
+    place and compares on one scale, whatever the numbers in its row.
+  - Large numbers are shortened where room is tight (295K, 6.23M), with the exact number on hover.
+  - A contributor whose lines are not counted shows "—" instead of "+0 −0", and says why: not
+    counted yet, older than the commits counted, or only merges. Partly counted ones say how many
+    of their commits are counted.
+- Blame:
+  - Empty lines no longer show a stray line in their annotation (VS Code drew the indentation
+    guide there, as if the annotation were not).
+  - New settings: the width of the annotations (`lanefold.blame.width`), how they name authors
+    (`lanefold.blame.author`: the whole name, the first name, "Maneeshi S.", "M. Sharma",
+    initials or the email's name) and date changes (`lanefold.blame.date`: in words, the day, ISO
+    dates or none), and whether they are tinted by age (`lanefold.blame.heat`).
+
 ## 0.1.3
 
 - Branches can be deleted from their remote: from a remote branch's menu (in the graph or the
