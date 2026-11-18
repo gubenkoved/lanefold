@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1
+
+- Clearer in dark and high contrast themes:
+  - A toggle's chosen option is lighter than the others in dark themes. It had the page's own
+    colour and looked sunk into the control.
+  - The editor tab's icon shows. It was black: hard to see on a dark tab, and invisible on a high
+    contrast one.
+  - The repository picker and the fetch, pull and push buttons have an edge, as the toolbar's
+    other controls do. In a high contrast theme they had no outline at all.
+  - In high contrast themes, a pressed button (a pane shown, view options changed) looks pressed.
+- In the statistics, the accent bar on the row of the author they show runs straight. It bent round
+  the row's rounded corners.
+
 ## 0.2.0
 
 - Links to the code host: Lanefold reads which host each remote is on (GitHub, GitLab, Bitbucket
