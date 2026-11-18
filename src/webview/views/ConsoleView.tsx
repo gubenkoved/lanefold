@@ -5,6 +5,7 @@ import { CommandLine } from '../components/CommandLine';
 import { EmptyState } from '../components/EmptyState';
 import { Icon } from '../components/Icon';
 import { IconButton } from '../components/IconButton';
+import { segmentedClass } from '../components/Segmented';
 import { toast } from '../components/Toast';
 import { useApp } from '../state/store';
 import { consoleRows } from './consoleRows';
@@ -202,21 +203,11 @@ export function ConsoleView() {
   return (
     <div className={styles.root}>
       <div className={styles.toolbar}>
-        <div className={styles.segmented} role="group" aria-label="Show">
-          <button
-            type="button"
-            className={styles.segment}
-            aria-pressed={filter === 'changes'}
-            onClick={() => setFilter('changes')}
-          >
+        <div className={segmentedClass()} role="group" aria-label="Show">
+          <button type="button" aria-pressed={filter === 'changes'} onClick={() => setFilter('changes')}>
             Changes <span className={styles.count}>{changes.length}</span>
           </button>
-          <button
-            type="button"
-            className={styles.segment}
-            aria-pressed={filter === 'all'}
-            onClick={() => setFilter('all')}
-          >
+          <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
             All commands <span className={styles.count}>{entries.length}</span>
           </button>
         </div>

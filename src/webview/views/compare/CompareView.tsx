@@ -4,6 +4,7 @@ import { errorText } from '../../bridge/errorText';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
 import { openPicker } from '../../components/Picker';
+import { segmentedClass } from '../../components/Segmented';
 import { Splitter, usePersistentSize } from '../../components/Splitter';
 import { toast } from '../../components/Toast';
 import { GraphPane } from '../../graph/GraphPane';
@@ -259,7 +260,7 @@ export function CompareView({ tab, repoId, active }: CompareViewProps) {
         </button>
         {toSide}
         <div
-          className={styles.segmented}
+          className={segmentedClass()}
           role="radiogroup"
           aria-label="Comparison"
           onKeyDown={(event) => {

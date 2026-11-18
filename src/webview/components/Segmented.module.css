@@ -1,0 +1,61 @@
+/*
+ * Segmented controls, one choice of a few: every toggle in the app, the Segmented component's and
+ * the hand-made ones (which take `segmentedClass`). The group is a track, its buttons the segments;
+ * the chosen one (aria-checked, or aria-pressed for toggle buttons) is a thumb raised above the
+ * track (see --lf-track and --lf-thumb in tokens.css).
+ */
+.group {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 2px;
+  border-radius: var(--lf-radius);
+  background: var(--lf-track);
+}
+
+.group > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-sm);
+  white-space: nowrap;
+  transition:
+    background-color var(--lf-dur-2) var(--lf-ease-out),
+    color var(--lf-dur-2) var(--lf-ease-out),
+    box-shadow var(--lf-dur-2) var(--lf-ease-out);
+}
+
+.group > button :global(.codicon) {
+  font-size: 13px;
+}
+
+.group > button:hover:not(:disabled) {
+  color: var(--lf-fg);
+}
+
+.group > button:is([aria-checked='true'], [aria-pressed='true']) {
+  background: var(--lf-thumb);
+  color: var(--lf-fg);
+  box-shadow: var(--lf-thumb-shadow);
+}
+
+.group > button:disabled {
+  cursor: not-allowed;
+}
+
+/* A toolbar's, smaller (an icon and a word), and a sheet's, larger. */
+.small > button {
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+}
+
+.large > button {
+  height: 24px;
+  padding: 0 12px;
+}

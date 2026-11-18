@@ -244,34 +244,9 @@
   color: var(--lf-fg-muted);
 }
 
+/* The toggle keeps to its own width in the column (it looks like every toggle: Segmented). */
 .segmented {
-  display: inline-flex;
   align-self: flex-start;
-  padding: 2px;
-  border-radius: var(--lf-radius);
-  background: var(--lf-bg-muted);
-}
-
-.segmented button {
-  height: 22px;
-  padding: 0 10px;
-  border: none;
-  border-radius: var(--lf-radius-sm);
-  background: transparent;
-  color: var(--lf-fg-muted);
-  font-size: var(--lf-text-sm);
-  white-space: nowrap;
-  transition:
-    background-color var(--lf-dur-2) var(--lf-ease-out),
-    color var(--lf-dur-2) var(--lf-ease-out);
-}
-
-.segmented button[aria-checked='true'] {
-  background: var(--lf-bg);
-  color: var(--lf-fg);
-  box-shadow:
-    var(--lf-shadow-1),
-    0 0 0 1px var(--lf-hairline);
 }
 
 .divergence {

@@ -18,6 +18,7 @@ import {
 } from '../../../shared/stats';
 import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
+import { Segmented, type SegmentOption } from '../../components/Segmented';
 import { absoluteTime, relativeLong } from '../../graph/format';
 import { useHost } from '../../hostContext';
 import { useQuery, useRepoVersion } from '../../state/queries';
@@ -27,7 +28,6 @@ import { useAnimationLevel } from '../../state/theme';
 import { openFileHistoryTab } from '../log/logMenus';
 import { useElementWidth } from '../log/LogView';
 import { ActionButton, Avatar, ErrorLine, LoadingLine } from '../log/parts';
-import { Segmented, type SegmentOption } from './Segmented';
 import { ActivityChart, LanguageBar, PunchCard } from './StatsCharts';
 import { ContributorList, HotspotList } from './StatsLists';
 import {

@@ -161,6 +161,7 @@ function Choice<T extends string>({
         value={value}
         options={options}
         onChange={onChange}
+        size="large"
         className={styles.segmented}
       />
       <span className={styles.hint} id={`${id}-hint`}>

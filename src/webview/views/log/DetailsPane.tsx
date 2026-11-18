@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
 import { IconButton } from '../../components/IconButton';
 import { openMenu, type MenuEntry } from '../../components/Menu';
+import { segmentedClass } from '../../components/Segmented';
 import { toast } from '../../components/Toast';
 import { absoluteTime, isWorkingTreeSha, relativeLong, shortSha } from '../../graph/format';
 import type { LogModel } from '../../graph/logModel';
@@ -748,7 +749,11 @@ function CompareDetails({
           )}
         </div>
         {!worktree ? (
-          <div className={styles.segmented} role="radiogroup" aria-label="Comparison">
+          <div
+            className={segmentedClass('medium', styles.segmented)}
+            role="radiogroup"
+            aria-label="Comparison"
+          >
             <button
               type="button"
               role="radio"

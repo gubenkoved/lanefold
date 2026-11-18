@@ -4,6 +4,7 @@ import { Icon } from '../../components/Icon';
 import { IconButton } from '../../components/IconButton';
 import { openMenu, type MenuEntry } from '../../components/Menu';
 import { openPicker } from '../../components/Picker';
+import { segmentedClass } from '../../components/Segmented';
 import { SCOPE_ICONS } from '../../components/TabStrip';
 import { columnToggleEntries, useGraphColumns } from '../../graph/columnMenus';
 import type { LogModel } from '../../graph/logModel';
@@ -376,7 +377,7 @@ export function LogToolbar({
         />
       ) : null}
       <SearchBox {...search} />
-      <div className={styles.segmented} role="radiogroup" aria-label="Search results">
+      <div className={segmentedClass('small')} role="radiogroup" aria-label="Search results">
         <button
           type="button"
           role="radio"

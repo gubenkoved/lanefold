@@ -3,6 +3,7 @@ import type { RefScope, ViewConfig } from '../../../shared/models';
 import { Icon } from '../../components/Icon';
 import { IconButton } from '../../components/IconButton';
 import { openMenu, type MenuEntry } from '../../components/Menu';
+import { segmentedClass } from '../../components/Segmented';
 import { SCOPE_ICONS } from '../../components/TabStrip';
 import { toast } from '../../components/Toast';
 import type { ThemeKind } from '../../graph/palette';
@@ -313,7 +314,7 @@ export function ReposToolbar({
   return (
     <div className={toolbar.toolbar}>
       <SearchBox {...search} />
-      <div className={toolbar.segmented} role="radiogroup" aria-label="Search results">
+      <div className={segmentedClass('small')} role="radiogroup" aria-label="Search results">
         <button
           type="button"
           role="radio"

@@ -54,6 +54,15 @@
   --lf-input-fg: var(--vscode-input-foreground, #cccccc);
   --lf-input-border: var(--vscode-input-border, transparent);
   --lf-input-placeholder: var(--vscode-input-placeholderForeground, #989898);
+  /*
+   * Segmented controls (one choice of a few): a translucent track, a step off whatever surface it
+   * sits on, and a thumb on the chosen segment, raised above the track. Raised reads lighter in a
+   * dark theme, where a thumb of the surface's own colour would look sunk into the track; light
+   * and high contrast themes raise it with the surface's colour and an edge (below).
+   */
+  --lf-track: color-mix(in srgb, var(--lf-fg) 8%, transparent);
+  --lf-thumb: color-mix(in srgb, var(--lf-fg) 13%, transparent);
+  --lf-thumb-shadow: var(--lf-shadow-1);
 
   /* Semantic (git) */
   --lf-added: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
@@ -175,13 +184,16 @@
 /*
  * Light themes' description color is about as light as small text can be: faint text uses it too.
  * Their error red, success green and warning amber are too light for small text on white (3.1 to
- * 4.4:1): some foreground mixed in makes them read at 4.5:1.
+ * 4.4:1): some foreground mixed in makes them read at 4.5:1. A segmented control's thumb is the
+ * surface's white, lifted by a shadow and an edge.
  */
 body.vscode-light {
   --lf-fg-faint: var(--lf-fg-muted);
   --lf-error: color-mix(in srgb, var(--vscode-errorForeground, #e51400) 70%, var(--lf-fg));
   --lf-success: color-mix(in srgb, var(--vscode-testing-iconPassed, #388a34) 75%, var(--lf-fg));
   --lf-warning: color-mix(in srgb, var(--vscode-editorWarning-foreground, #bf8803) 60%, var(--lf-fg));
+  --lf-thumb: var(--lf-bg);
+  --lf-thumb-shadow: var(--lf-shadow-1), 0 0 0 1px var(--lf-hairline);
 }
 
 /* High contrast: no translucency, crisp contrast borders everywhere. */
@@ -196,4 +208,7 @@ body.vscode-high-contrast-light {
   --lf-shadow-3: 0 0 0 1px var(--vscode-contrastBorder, #6fc3df);
   --lf-secondary-bg: var(--vscode-button-secondaryBackground, transparent);
   --lf-secondary-hover: var(--vscode-button-secondaryHoverBackground, transparent);
+  --lf-track: transparent;
+  --lf-thumb: var(--lf-bg);
+  --lf-thumb-shadow: 0 0 0 1px var(--lf-hairline);
 }

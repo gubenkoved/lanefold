@@ -1,4 +1,5 @@
 import { useRef, type KeyboardEvent } from 'react';
+import styles from './Segmented.module.css';
 
 export interface SegmentOption<T extends string> {
   readonly value: T;
@@ -7,10 +8,28 @@ export interface SegmentOption<T extends string> {
   readonly title?: string;
 }
 
+/** A toolbar's segments are small, a sheet's large. */
+export type SegmentSize = 'small' | 'medium' | 'large';
+
+const SIZES: Record<SegmentSize, string | undefined> = {
+  small: styles.small,
+  medium: undefined,
+  large: styles.large,
+};
+
+/**
+ * The classes of a segmented control's group, its buttons the segments: every toggle looks the
+ * same, the hand-made ones (a toggle-button group, a group with icons) too. `className` adds the
+ * group's place in a layout.
+ */
+export function segmentedClass(size: SegmentSize = 'medium', className?: string): string {
+  return [styles.group, SIZES[size], className].filter(Boolean).join(' ');
+}
+
 /**
  * One choice of a few, as a radio group: one tab stop, arrow keys move the choice (and focus
- * with it), as radio groups do. `className` styles the group (its buttons are the choices);
- * `labelledBy` names it by a visible label instead of `label`.
+ * with it), as radio groups do. `size` sets the segments' height, `className` adds the group's
+ * place in a layout; `labelledBy` names it by a visible label instead of `label`.
  */
 export function Segmented<T extends string>({
   label,
@@ -19,6 +38,7 @@ export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  size,
   className,
   disabled,
 }: {
@@ -28,6 +48,7 @@ export function Segmented<T extends string>({
   value: T;
   options: readonly SegmentOption<T>[];
   onChange: (value: T) => void;
+  size?: SegmentSize;
   className?: string;
   disabled?: boolean;
 }) {
@@ -50,7 +71,7 @@ export function Segmented<T extends string>({
   };
   return (
     <div
-      className={className}
+      className={segmentedClass(size, className)}
       role="radiogroup"
       aria-label={labelledBy ? undefined : label}
       aria-labelledby={labelledBy}
