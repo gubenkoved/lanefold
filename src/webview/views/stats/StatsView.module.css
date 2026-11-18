@@ -532,8 +532,12 @@
   cursor: default;
 }
 
-/* The author the view shows. */
+/*
+ * The author the view shows. Its accent edge runs straight: the row's corners on that side are
+ * square (round ones would bend the edge round them).
+ */
 .contributor[data-filtered] {
+  border-radius: 0 var(--lf-radius-sm) var(--lf-radius-sm) 0;
   background: color-mix(in srgb, var(--lf-accent) 12%, transparent);
   box-shadow: inset 2px 0 0 var(--lf-accent);
 }
@@ -542,8 +546,9 @@
   font-weight: 600;
 }
 
-/* The keyboard's row, while the list has focus. */
+/* The keyboard's row, while the list has focus (its ring replaces a filtered row's edge). */
 .list:focus-visible [aria-selected='true'] {
+  border-radius: var(--lf-radius-sm);
   background: var(--lf-selection);
   color: var(--lf-selection-fg);
   box-shadow: inset 0 0 0 1px var(--lf-focus);
