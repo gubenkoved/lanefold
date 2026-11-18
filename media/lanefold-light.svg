@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#424242" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <!-- The editor tab's icon in light themes: npm run logo makes it from lanefold.svg. -->
+  <path d="M5 3.5V14l5 5h10.5"/>
+  <path d="M9 3.5V13l2 2h9.5"/>
+  <path d="M13 3.5V11h7.5"/>
+</svg>

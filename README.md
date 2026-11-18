@@ -190,7 +190,8 @@ gives webviews, captured by the integration tests with `LANEFOLD_CAPTURE_THEMES=
 | `npm run test:vscode` | The extension in a real VS Code (on Linux, run it with `xvfb-run -a`)                         |
 
 `npm run package` builds the VSIX, and `npm run logo` renders the PNG sizes of the logo from
-`media/logo/lanefold.svg`.
+`media/logo/lanefold.svg` and the editor tab's icons (a dark and a light one) from the panel
+glyph, `media/lanefold.svg`.
 
 The README's screenshots are in `media/`, and copies are in a
 [secret gist](https://gist.github.com/gubenkoved/66fff765499dc9a41fddfc132bbf5861) that the

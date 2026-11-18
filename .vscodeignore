@@ -6,6 +6,8 @@
 !LICENSE
 !media/logo/lanefold-256.png
 !media/lanefold.svg
+!media/lanefold-dark.svg
+!media/lanefold-light.svg
 !dist/extension.js
 !dist/logWorker.js
 !dist/*.LEGAL.txt

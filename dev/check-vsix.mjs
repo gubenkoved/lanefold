@@ -24,6 +24,8 @@ const required = [
   'extension/LICENSE.txt',
   'extension/media/logo/lanefold-256.png',
   'extension/media/lanefold.svg',
+  'extension/media/lanefold-dark.svg',
+  'extension/media/lanefold-light.svg',
   'extension/dist/extension.js',
   'extension/dist/logWorker.js',
   'extension/dist/scripts/askpass-main.js',

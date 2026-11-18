@@ -32,9 +32,11 @@ export class EditorPanels implements vscode.Disposable {
   }
 
   private setup(panel: vscode.WebviewPanel, state: unknown): void {
+    // A tab's icon is drawn as an image, where the glyph's currentColor would be black: these are
+    // copies of it in the themes' icon colours.
     panel.iconPath = {
-      light: vscode.Uri.joinPath(this.extensionUri, 'media', 'lanefold.svg'),
-      dark: vscode.Uri.joinPath(this.extensionUri, 'media', 'lanefold.svg'),
+      light: vscode.Uri.joinPath(this.extensionUri, 'media', 'lanefold-light.svg'),
+      dark: vscode.Uri.joinPath(this.extensionUri, 'media', 'lanefold-dark.svg'),
     };
     this.panels.add(panel);
     panel.onDidDispose(() => this.panels.delete(panel));

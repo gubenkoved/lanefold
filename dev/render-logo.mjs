@@ -1,9 +1,10 @@
-// Renders the logo's PNG sizes from its SVGs with Chromium (the Marketplace icon is one of them).
-//   node dev/render-logo.mjs            → media/logo/lanefold-<size>.png
+// Renders the logo's PNG sizes from its SVGs with Chromium (the Marketplace icon is one of them),
+// and the editor tab's icons from the panel glyph.
+//   node dev/render-logo.mjs            → media/logo/lanefold-<size>.png, media/lanefold-<theme>.svg
 //   node dev/render-logo.mjs <sheet.png> → also a preview sheet of the sizes and the panel glyph,
 //                                          on dark, light and Marketplace-banner backgrounds
 import { chromium } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const LOGO = 'media/logo';
@@ -15,6 +16,22 @@ const svg = (name) => readFileSync(join(LOGO, name), 'utf8');
 const full = svg('lanefold.svg');
 const small = svg('lanefold-small.svg');
 const glyph = readFileSync('media/lanefold.svg', 'utf8');
+
+/**
+ * VS Code draws an editor tab's icon as an image, where the glyph's currentColor is black (unseen
+ * on a dark tab): the tab gets a copy of the glyph in each theme's icon colour.
+ */
+const TAB_ICON_COLORS = { dark: '#c5c5c5', light: '#424242' };
+for (const [theme, color] of Object.entries(TAB_ICON_COLORS))
+  writeFileSync(
+    `media/lanefold-${theme}.svg`,
+    glyph
+      .replace('currentColor', color)
+      .replace(
+        /(<svg[^>]*>)/,
+        `$1\n  <!-- The editor tab's icon in ${theme} themes: npm run logo makes it from lanefold.svg. -->`,
+      ),
+  );
 
 /** An SVG as an <img>: each one keeps its own gradient ids. */
 const img = (source, size) =>
