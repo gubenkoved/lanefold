@@ -15,22 +15,23 @@ const heading = (page: Page, name: string) => grid(page).getByRole('columnheader
 
 /** The headings on screen, in DOM order, after checking that it is their order on screen too. */
 async function headings(page: Page): Promise<string[]> {
-  const cells = grid(page).locator(':scope > [role="row"] > [role="columnheader"]:visible');
-  return inScreenOrder(cells);
+  return inScreenOrder(grid(page).locator(':scope > [role="row"] > [role="columnheader"]'));
 }
 
 /**
- * The cells' texts, in DOM order, once their left edges are seen to follow that order. All are
- * read at once: as a resized graph settles, a cell can go between two reads of it.
+ * The texts of the cells on screen, in DOM order, once their left edges are seen to follow that
+ * order. Which are on screen is read along with where, in one go: as a graph settles into its
+ * width, a cell found showing can be gone by the time it is measured.
  */
 async function inScreenOrder(cells: Locator): Promise<string[]> {
   // The test project has no DOM types: what is used of them, typed as far as needed.
-  type Cell = { getBoundingClientRect(): { left: number }; innerText: string };
+  type Cell = { getBoundingClientRect(): { left: number; width: number; height: number }; innerText: string };
   const read = await cells.evaluateAll((elements) =>
-    (elements as unknown as Cell[]).map((cell) => ({
-      left: cell.getBoundingClientRect().left,
-      text: cell.innerText,
-    })),
+    (elements as unknown as Cell[])
+      .map((cell) => ({ box: cell.getBoundingClientRect(), text: cell.innerText }))
+      // A cell left out takes no room.
+      .filter(({ box }) => box.width > 0 && box.height > 0)
+      .map(({ box, text }) => ({ left: box.left, text })),
   );
   const lefts = read.map((cell) => cell.left);
   expect(lefts).toEqual([...lefts].sort((a, b) => a - b));
@@ -120,7 +121,8 @@ test('columns are switched off, moved from the menu, the keyboard or by dragging
 test('a narrow graph leaves out the hash and the author, and its menu says so', async ({ page }) => {
   await page.setViewportSize({ width: 760, height: 520 });
   await open(page);
-  expect(await headings(page)).toEqual(['COMMIT MESSAGE', 'DATE']);
+  // The graph fits its columns to its width once it is measured, maybe after its rows show.
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'DATE']);
   await heading(page, 'Date').click({ button: 'right' });
   const hash = page.getByRole('menuitemcheckbox', { name: 'Commit hash', checked: true });
   await hash.hover();
@@ -215,7 +217,7 @@ test('a narrow graph leaves out the counts first, and reads none of them', async
   asked.length = 0;
   await page.reload();
   await expect(graphRow(page, 'Add dark mode toggle')).toBeVisible();
-  expect(await headings(page)).toEqual(['COMMIT MESSAGE', 'DATE']);
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'DATE']);
   await heading(page, 'Date').click({ button: 'right' });
   await page.getByRole('menuitemcheckbox', { name: 'Lines changed', checked: true }).hover();
   await expect(page.getByText('Shown when the graph is wider')).toBeVisible();
