@@ -2,7 +2,7 @@
   "name": "lanefold-git",
   "displayName": "Lanefold Git Graph",
   "description": "A Git client built around the commit graph: see the git commands of every operation before it runs, undo it afterwards, and edit history visually.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "preview": true,
   "publisher": "EugeneGubenkov",
   "license": "MIT",

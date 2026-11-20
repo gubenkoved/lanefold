@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0
+
+- Two more columns in the commit graph, off until you switch them on (right-click a column
+  heading, or the view options): Files, the files each commit added, changed and removed, and
+  Lines, its lines added and removed.
+  - Large counts are shortened (`1.4K`, `1.5M`) and each keeps a place of its own, so rows line
+    up. Pointing at a cell shows the exact counts.
+  - A merge is counted against its first parent, as its list of changed files is. A renamed file
+    is one file changed.
+  - git is asked for them only while they show, for the commits in view, once the graph stops
+    scrolling. Lines take git many times longer than files: they are read apart, and only while
+    their own column shows.
+  - A narrow graph leaves these columns out first, and then reads nothing for them.
+- While a commit is split, the banner's Commit part 1… opens the details pane when it is closed.
+  The button did nothing then.
+  - From a tab without the uncommitted changes (a branch's or a file's history), it goes to a tab
+    that has their row.
+  - With two log tabs, the cursor goes to the commit box of the tab in front.
+  - A search that filters the uncommitted changes out says so, with the way to them.
+
 ## 0.2.1
 
 - Clearer in dark and high contrast themes:
