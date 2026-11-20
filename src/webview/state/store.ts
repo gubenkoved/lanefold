@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   DEFAULT_SETTINGS,
   isLineRange,
+  viewShowsWorkingTree,
   type ConsoleEntry,
   type GitInfo,
   type HeadInfo,
@@ -11,8 +12,9 @@ import {
 } from '../../shared/models';
 import { errorText } from '../bridge/errorText';
 import type { HostConnection } from '../bridge/host';
+import { isWorkingTreeSha } from '../graph/format';
 import { mark } from '../perf';
-import { requestReveal } from './reveal';
+import { requestReveal, type RevealShow } from './reveal';
 import { adoptSharedTab, noteSharedTab, SHARED_TAB_KEY, withSharedTab } from './sharedTab';
 import {
   compareTitle,
@@ -51,17 +53,23 @@ function openHistoryFromHost(command: string, args: unknown): void {
   });
 }
 
-/** Shows a commit in a log tab: the active one, else the first one, else a new "All" tab. */
-export function showInLog(repoId: string, sha: string): void {
+/**
+ * Shows a commit in a log tab: the active one, else the first one, else a new "All" tab. The
+ * uncommitted changes (the all-zero ID) go to a tab that has their row: the history of chosen
+ * branches, of a file or of lines has none. `show` says how much of it to bring into view.
+ */
+export function showInLog(repoId: string, sha: string, show?: RevealShow): void {
   const { tabs, activateTab, addTab } = useApp.getState();
-  const active = tabs.tabs.find((tab) => tab.id === tabs.activeTabId);
-  if (active?.kind !== 'log') {
-    const log = tabs.tabs.find((tab) => tab.kind === 'log');
+  const uncommitted = isWorkingTreeSha(sha);
+  const fits = (tab: TabModel | undefined): boolean =>
+    tab?.kind === 'log' && !(uncommitted && tab.view && !viewShowsWorkingTree(tab.view));
+  if (!fits(tabs.tabs.find((tab) => tab.id === tabs.activeTabId))) {
+    const log = tabs.tabs.find(fits);
     if (log) activateTab(log.id);
     // Without one the reveal would wait, then happen whenever a log tab next opens.
     else addTab({ kind: 'log', title: 'All', view: { scope: { type: 'all' } } });
   }
-  requestReveal(repoId, sha);
+  requestReveal(repoId, sha, show);
 }
 
 /** Activates the Stashes tab, opening one if there is none; its list takes keyboard focus. */

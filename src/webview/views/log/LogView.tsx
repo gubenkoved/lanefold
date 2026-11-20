@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'motion/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Splitter, usePersistentSize } from '../../components/Splitter';
 import { toast } from '../../components/Toast';
 import { isWorkingTreeSha } from '../../graph/format';
@@ -9,11 +9,12 @@ import { useHost } from '../../hostContext';
 import { useCodeHosts } from '../../state/codeHosts';
 import { useOperations } from '../../state/operations';
 import { operationMarks } from './marks';
-import { takeReveal, useReveal } from '../../state/reveal';
+import { requestReveal, takeReveal, useReveal } from '../../state/reveal';
 import { startRewrite, useRewrite } from '../../state/rewrite';
 import type { TabModel } from '../../state/tabs';
 import { useApp } from '../../state/store';
 import { usePalette } from '../../state/theme';
+import { focusWhenShown, useFocusWhenShown } from '../../state/viewFocus';
 import { editableHistory } from '../rewrite/entryPoints';
 import { HistoryEditor } from '../rewrite/HistoryEditor';
 import { BranchesPane } from './BranchesPane';
@@ -56,9 +57,9 @@ export function usePersistentFlag(key: string, initial: boolean): [boolean, (val
       return initial;
     }
   });
-  return [
-    value,
-    (next) => {
+  // The same function from render to render: an effect can depend on it.
+  const set = useCallback(
+    (next: boolean) => {
       setValue(next);
       try {
         localStorage.setItem(`lanefold.flag.${key}`, next ? '1' : '0');
@@ -66,7 +67,9 @@ export function usePersistentFlag(key: string, initial: boolean): [boolean, (val
         // Not persisted; fine.
       }
     },
-  ];
+    [key],
+  );
+  return [value, set];
 }
 
 /** The element's width; a hidden tab (width 0) keeps its last one, so its panes stay as they were. */
@@ -298,7 +301,8 @@ export function LogView({ tab, repoId, active }: LogViewProps) {
     return () => window.removeEventListener('keydown', onKeyDown);
   });
 
-  // A commit the host asked to show (from a blame hover or the status bar).
+  // A commit the host asked to show (from a blame hover or the status bar), or the app itself
+  // (the uncommitted changes of a commit being split).
   const revealRequest = useReveal((state) =>
     active && state.request?.repoId === repoId ? state.request : undefined,
   );
@@ -309,13 +313,34 @@ export function LogView({ tab, repoId, active }: LogViewProps) {
       const graph = graphRef.current;
       if (graph?.goTo(reveal.sha)) {
         takeReveal(reveal.id);
-        graph.focus();
+        // Its details were asked for too: the pane opens for them (where both do not fit beside
+        // the graph, the branches pane steps aside).
+        if (reveal.show !== 'row') setDetailsOpen(true);
+        // The commit box takes the cursor once it is there (see below).
+        if (reveal.show === 'commitBox') focusWhenShown('commitBox');
+        else graph.focus();
         return true;
       }
       if (model.phase === 'ready' || model.phase === 'error') {
-        // Uncommitted changes appear once the view reloads after the operation that made them
-        // (splitting a commit): watch for them a little while, without a word.
         if (isWorkingTreeSha(reveal.sha)) {
+          // Filtered out by the search, which keeps matching commits only: say so, with the way
+          // to them.
+          if (model.source?.hasWorkingTreeRow) {
+            takeReveal(reveal.id);
+            toast('The uncommitted changes are not in this view', {
+              detail: 'The search shows only the commits that match.',
+              action: {
+                label: 'Switch to Highlight',
+                run: () => {
+                  setFilterMode(false);
+                  requestReveal(reveal.repoId, reveal.sha, reveal.show);
+                },
+              },
+            });
+            return true;
+          }
+          // Uncommitted changes appear once the view reloads after the operation that made them
+          // (splitting a commit): watch for them a little while, without a word.
           if (Date.now() - reveal.time < 5000) return false;
           takeReveal(reveal.id);
           return true;
@@ -335,7 +360,13 @@ export function LogView({ tab, repoId, active }: LogViewProps) {
     if (attempt()) return;
     // Still streaming: try again as rows arrive.
     return model.subscribe(() => void attempt());
-  }, [revealRequest, model]);
+  }, [revealRequest, model, setDetailsOpen, setFilterMode]);
+  // This view's own commit box: a log tab kept behind this one may have one too.
+  useFocusWhenShown('commitBox', active, () => {
+    const box = rootRef.current?.querySelector<HTMLElement>('form[aria-label="Commit"] textarea');
+    box?.focus();
+    return !!box;
+  });
 
   const onOpen = (row: number) => {
     const ctx = context();

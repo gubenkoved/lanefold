@@ -224,6 +224,116 @@ test('splits one file’s changes into two commits, a hunk at a time', async ({ 
   expect(git(repo, 'status', '--porcelain')).toBe('');
 });
 
+/** Starts splitting “Update dependencies” (two files) from its menu, in the tab in front. */
+async function splitUpdateDependencies(page: Page): Promise<void> {
+  await graphRow(page, 'Update dependencies').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Edit history' }).hover();
+  await page.getByRole('menuitem', { name: /Split commit/ }).click();
+  await historyEditor(page)
+    .getByRole('button', { name: /^Apply/ })
+    .click();
+  await expect(banner(page)).toContainText('no part committed yet');
+}
+
+/** The commit box of the tab in front (a log tab kept behind it may have one too). */
+const commitMessage = (page: Page) =>
+  page
+    .getByRole('tabpanel')
+    .getByRole('form', { name: 'Commit' })
+    .getByRole('textbox', { name: 'Commit message' });
+
+test('the banner brings a closed details pane back: for the changes, and for the commit box', async ({
+  page,
+}) => {
+  // Too narrow for the branches and the details beside the graph: the two take turns.
+  await page.setViewportSize({ width: 1000, height: 620 });
+  const repo = copyDemo({ stash: true });
+  await open(page, repo);
+  const branches = page.getByRole('complementary', { name: 'Branches' });
+  const details = page.getByRole('complementary', { name: 'Commit details' });
+  await page.getByRole('button', { name: 'Show branches' }).click();
+  await expect(branches.getByRole('tree')).toBeVisible();
+  await expect(details).toBeHidden();
+
+  // Taken apart, its changes come into view by themselves: the pane opens on them.
+  await splitUpdateDependencies(page);
+  await expect(details.getByRole('heading', { name: 'Uncommitted changes' })).toBeVisible();
+  await expect(branches).toBeHidden();
+
+  // Closed again, with a file staged elsewhere (the editor's own Source Control view, a terminal):
+  // “Commit part 1…” opens it with the cursor in the commit box, and the part is committed.
+  await page.getByRole('button', { name: 'Show branches' }).click();
+  await expect(details).toBeHidden();
+  git(repo, 'add', 'package.json');
+  await banner(page).getByRole('button', { name: 'Commit part 1…' }).click();
+  await expect(commitMessage(page)).toBeFocused();
+  const box = details.getByRole('form', { name: 'Commit' });
+  await expect(box).toContainText('Part 1 of');
+  await expect(branches).toBeHidden();
+  // What was staged outside shows once the view has noticed it.
+  await expect(box.getByRole('button', { name: 'Commit 1 file' })).toBeVisible();
+  await page.keyboard.type('Bump the version');
+  await page.keyboard.press('Control+Enter');
+  await expect(banner(page)).toContainText('1 part committed');
+  expect(git(repo, 'show', '--name-only', '--format=%s', 'HEAD')).toBe('Bump the version\n\npackage.json');
+
+  // Hidden by its own button: “Show the changes” opens it too.
+  await page.getByRole('button', { name: 'Hide details' }).click();
+  await expect(details).toBeHidden();
+  await banner(page).getByRole('button', { name: 'Show the changes' }).click();
+  await expect(details.getByRole('heading', { name: 'Uncommitted changes' })).toBeVisible();
+  await expect(details.getByRole('listitem').filter({ hasText: 'forecast.ts' })).toBeVisible();
+});
+
+test('Commit part 1… goes to a log tab that has the uncommitted changes, and to its commit box', async ({
+  page,
+}) => {
+  const repo = copyDemo({ stash: true });
+  await open(page, repo);
+  // The history from one commit, in a tab of its own: no uncommitted changes there.
+  await graphRow(page, 'Polish dashboard layout').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: /Show history from here/ }).click();
+  const tabs = page.getByRole('tab');
+  await expect(tabs).toHaveCount(4);
+  await tabs.nth(0).click();
+  await splitUpdateDependencies(page);
+  await expect(commitMessage(page)).toBeVisible();
+
+  // From that tab, the first tab that shows them comes to the front.
+  await tabs.nth(2).click();
+  await expect(graphRow(page, 'Polish dashboard layout')).toBeVisible();
+  await expect(graphRow(page, 'Uncommitted changes')).toBeHidden();
+  await banner(page).getByRole('button', { name: 'Commit part 1…' }).click();
+  await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
+  await expect(commitMessage(page)).toBeFocused();
+
+  // From another tab that shows them (the first one's commit box is still there, behind it), the
+  // cursor goes to the box in front.
+  await tabs.nth(1).click();
+  await expect(graphRow(page, 'Polish dashboard layout')).toBeVisible();
+  await banner(page).getByRole('button', { name: 'Commit part 1…' }).click();
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await expect(commitMessage(page)).toBeFocused();
+  await expect(page.locator('form[aria-label="Commit"]')).toHaveCount(2);
+});
+
+test('a search that filters the uncommitted changes out says so, with the way to them', async ({ page }) => {
+  const repo = copyDemo({ stash: true });
+  await open(page, repo);
+  await splitUpdateDependencies(page);
+  await page.getByRole('radio', { name: 'Filter' }).click();
+  await page.getByRole('textbox', { name: /Search commits/ }).fill('forecast API client');
+  await expect(graphRow(page, 'Add forecast API client')).toBeVisible();
+  await expect(graphRow(page, 'Uncommitted changes')).toBeHidden();
+
+  await banner(page).getByRole('button', { name: 'Commit part 1…' }).click();
+  const toast = page.getByRole('status').filter({ hasText: 'The uncommitted changes are not in this view' });
+  await expect(toast).toBeVisible();
+  await toast.getByRole('button', { name: 'Switch to Highlight' }).click();
+  await expect(graphRow(page, 'Uncommitted changes')).toHaveAttribute('aria-selected', 'true');
+  await expect(commitMessage(page)).toBeFocused();
+});
+
 for (const theme of ['dark-modern', 'light-modern', 'dark-hc', 'light-hc']) {
   test(`the split banner and the commit box read at 4.5:1 or more (${theme})`, async ({ page }) => {
     const repo = twoHunkRepo();

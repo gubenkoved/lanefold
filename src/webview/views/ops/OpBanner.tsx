@@ -7,6 +7,7 @@ import { toast } from '../../components/Toast';
 import { shortSha } from '../../graph/format';
 import { useHost } from '../../hostContext';
 import { refreshOpState, runOperation, useOperations } from '../../state/operations';
+import type { RevealShow } from '../../state/reveal';
 import { showInLog, useApp } from '../../state/store';
 import { SubmoduleConflictRow } from './SubmoduleConflict';
 import styles from './OpBanner.module.css';
@@ -230,8 +231,7 @@ export function OpBanner() {
   // A commit just taken apart: its changes come into view (the files to stage, the commit box).
   const splitting = state?.split?.opened ? state.split.commit : undefined;
   useEffect(() => {
-    // The uncommitted changes are the row with the all-zero ID.
-    if (splitting && repoId) showInLog(repoId, '0'.repeat(splitting.length));
+    if (splitting && repoId) showSplitChanges(repoId, splitting);
   }, [splitting, repoId]);
 
   // A new stop (conflicts, say) takes focus when nothing else has it: after the history editor
@@ -351,7 +351,7 @@ export function OpBanner() {
                         className={styles.primary}
                         disabled={starting}
                         title="Stage the changes that belong in the first part, then write its message and commit"
-                        onClick={() => commitPart(repoId, split!.commit)}
+                        onClick={() => showSplitChanges(repoId, split!.commit, 'commitBox')}
                       >
                         <Icon name="git-commit" /> Commit part 1…
                       </button>
@@ -577,18 +577,13 @@ export function OpBanner() {
 }
 
 /**
- * Shows the uncommitted changes of a commit being split and puts the cursor in the commit box
- * (the details pane's, once the row is selected): where its next part is committed.
+ * Shows the uncommitted changes of a commit being split where its parts are made: their row
+ * selected in a log tab, the details pane open on the files to stage and the commit box (it
+ * opens if it was closed). 'commitBox' also puts the cursor in that box, for the next part.
  */
-function commitPart(repoId: string, commit: string): void {
-  showInLog(repoId, '0'.repeat(commit.length));
-  let tries = 0;
-  const focus = () => {
-    const box = document.querySelector<HTMLTextAreaElement>('form[aria-label="Commit"] textarea');
-    if (box) box.focus();
-    else if (++tries < 30) requestAnimationFrame(focus);
-  };
-  requestAnimationFrame(focus);
+function showSplitChanges(repoId: string, commit: string, show: RevealShow = 'details'): void {
+  // The uncommitted changes are the row with the all-zero ID.
+  showInLog(repoId, '0'.repeat(commit.length), show);
 }
 
 /** While a commit is split: what to do, and the parts committed so far (each shown in the graph on click). */
@@ -615,7 +610,7 @@ function SplitNote({
             <button
               type="button"
               className={styles.show}
-              onClick={() => showInLog(repoId, '0'.repeat(split.commit.length))}
+              onClick={() => showSplitChanges(repoId, split.commit)}
             >
               Show the changes
             </button>
