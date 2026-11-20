@@ -1,6 +1,6 @@
 import { GraphLayout } from '../../shared/graph/layout';
 import { GraphTopology } from '../../shared/graph/topology';
-import type { CommitMeta, HeadInfo, RefInfo, ViewConfig } from '../../shared/models';
+import type { CommitMeta, CommitStats, HeadInfo, RefInfo, ViewConfig } from '../../shared/models';
 import type { LogEnd, ReposLogSource } from '../../shared/protocol';
 import { errorText } from '../bridge/errorText';
 import type { HostRpc } from '../bridge/host';
@@ -296,5 +296,28 @@ export class ReposLogModel extends LogModel {
       throw failure;
     }
     return found;
+  }
+
+  /** Counts from each commit's repository (one request per repository). */
+  protected override async fetchStats(
+    shas: readonly string[],
+    lines: boolean,
+    signal: AbortSignal,
+  ): Promise<readonly CommitStats[]> {
+    const wanted = new Map<string, string[]>();
+    for (const sha of shas) {
+      const source = this.sourceOf(sha);
+      if (!source) continue;
+      const list = wanted.get(source.repoId);
+      if (list) list.push(sha);
+      else wanted.set(source.repoId, [sha]);
+    }
+    const found = await Promise.all(
+      [...wanted].map(([repoId, list]) =>
+        // A repository that fails leaves its commits out: the others' counts still show.
+        this.rpc.call('log.stats', { repoId, shas: list, lines }, { signal }).catch(() => []),
+      ),
+    );
+    return found.flat();
   }
 }

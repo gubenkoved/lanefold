@@ -12,7 +12,9 @@ shows the git commands it will use, and every change it makes to the repository 
 
 - A commit graph that streams history from git and stays responsive with millions of commits.
   Its author, date and hash columns can be switched off and moved: right-click or drag a column
-  heading.
+  heading. Two more columns are off until you switch them on: the files each commit added, changed
+  and removed, and its lines added and removed. git is asked for them only while they show, and
+  only for the commits in view.
 - Views as tabs: all branches, the current branch, local branches or the branches you choose;
   file, folder and line history; comparisons between two refs; stashes, the reflog and
   statistics.

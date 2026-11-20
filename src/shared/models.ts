@@ -130,6 +130,27 @@ export interface CommitMeta {
   readonly signed: boolean;
 }
 
+/**
+ * How much a commit changed, for the graph's Files and Lines columns: against its first parent
+ * (as the commit's file list is), a root commit against nothing.
+ */
+export interface CommitStats {
+  readonly sha: string;
+  /** Files added, changed in place (modified, renamed, of another type) and removed. */
+  readonly added: number;
+  readonly modified: number;
+  readonly removed: number;
+  /** The lines of those files; undefined when only the files were asked for. */
+  readonly lines?: CommitLineStats;
+}
+
+export interface CommitLineStats {
+  readonly added: number;
+  readonly removed: number;
+  /** Files whose lines git does not count (binary ones). */
+  readonly binary: number;
+}
+
 export type FileStatus = 'A' | 'M' | 'D' | 'R' | 'C' | 'T' | 'U' | 'X';
 
 export interface ChangedFile {

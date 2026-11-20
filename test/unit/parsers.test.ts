@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bodyOf, parseCommit, parseIdent, subjectOf } from '../../src/core/parsers/commit';
+import { parseCommitStats } from '../../src/core/parsers/commitStats';
 import { parseRawNumstat } from '../../src/core/parsers/diff';
 import { parseRefs, pickTrunk } from '../../src/core/parsers/refs';
 import { parseStatus, summarizeStatus } from '../../src/core/parsers/status';
@@ -178,6 +179,72 @@ describe('parseRawNumstat', () => {
         binary: false,
       },
       { status: 'D', path: 'gone.txt', additions: 0, deletions: 9, binary: false },
+    ]);
+  });
+});
+
+describe('parseCommitStats', () => {
+  const A = 'a'.repeat(40);
+  const B = 'b'.repeat(40);
+  const C = 'c'.repeat(40);
+  const z = '0'.repeat(40);
+  const raw = (status: string, ...paths: string[]) =>
+    `:100644 100644 ${z} ${z} ${status}\0${paths.join('\0')}\0`;
+
+  it('counts files per commit: added, changed in place and removed', () => {
+    const output =
+      `${A}\0${raw('A', 'new.txt')}${raw('M', 'edited.txt')}${raw('D', 'gone.txt')}${raw('T', 'link')}` +
+      `${B}\0${raw('R087', 'old name.txt', 'new name.txt')}${raw('C100', 'a.txt', 'copy.txt')}`;
+    expect(parseCommitStats(output, false)).toEqual([
+      { sha: A, added: 1, modified: 2, removed: 1 },
+      // A rename is one file changed in place; a copy is a new file.
+      { sha: B, added: 1, modified: 1, removed: 0 },
+    ]);
+  });
+
+  it('keeps a commit that changed nothing, and one whose parent is named', () => {
+    const output = `${A}\0${B} (from ${C})\0${raw('M', 'a.txt')}${C}\0`;
+    expect(parseCommitStats(output, false)).toEqual([
+      { sha: A, added: 0, modified: 0, removed: 0 },
+      { sha: B, added: 0, modified: 1, removed: 0 },
+      { sha: C, added: 0, modified: 0, removed: 0 },
+    ]);
+    expect(parseCommitStats('', true)).toEqual([]);
+  });
+
+  it('counts lines, with binary files and renames', () => {
+    const output =
+      `${A}\0${raw('M', 'a.txt')}${raw('A', 'logo.png')}${raw('R090', 'old.txt', 'new.txt')}` +
+      `12\t3\ta.txt\0-\t-\tlogo.png\0` +
+      `4\t1\t\0old.txt\0new.txt\0` +
+      `${B}\0${raw('D', 'b.txt')}0\t40\tb.txt\0`;
+    expect(parseCommitStats(output, true)).toEqual([
+      { sha: A, added: 1, modified: 2, removed: 0, lines: { added: 16, removed: 4, binary: 1 } },
+      { sha: B, added: 0, modified: 0, removed: 1, lines: { added: 0, removed: 40, binary: 0 } },
+    ]);
+  });
+
+  it('does not take a file named like a commit for one', () => {
+    const output =
+      `${A}\0${raw('A', B)}${raw('R100', C, B.replace(/b/g, 'd'))}2\t0\t${B}\0` +
+      `0\t0\t\0${C}\0${'d'.repeat(40)}\0`;
+    expect(parseCommitStats(output, true)).toEqual([
+      { sha: A, added: 1, modified: 1, removed: 0, lines: { added: 2, removed: 0, binary: 0 } },
+    ]);
+  });
+
+  it('does not count the lines git prints for a submodule', () => {
+    const gitlink = `:160000 160000 ${z} ${z} M\0vendor/lib\0`;
+    const output = `${A}\0${gitlink}${raw('M', 'a.txt')}1\t1\tvendor/lib\0` + `5\t2\ta.txt\0`;
+    expect(parseCommitStats(output, true)).toEqual([
+      { sha: A, added: 0, modified: 2, removed: 0, lines: { added: 5, removed: 2, binary: 0 } },
+    ]);
+  });
+
+  it('reads SHA-256 names', () => {
+    const long = 'e'.repeat(64);
+    expect(parseCommitStats(`${long}\0${raw('A', 'a.txt')}`, false)).toEqual([
+      { sha: long, added: 1, modified: 0, removed: 0 },
     ]);
   });
 });

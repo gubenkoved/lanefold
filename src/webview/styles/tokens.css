@@ -80,6 +80,7 @@
    * the foreground so it stays readable on every surface, selected rows included.
    */
   --lf-added-text: color-mix(in srgb, var(--lf-added) 72%, var(--lf-fg));
+  --lf-modified-text: color-mix(in srgb, var(--lf-modified) 72%, var(--lf-fg));
   --lf-deleted-text: color-mix(in srgb, var(--lf-deleted) 72%, var(--lf-fg));
 
   /*

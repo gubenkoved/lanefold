@@ -134,3 +134,90 @@ test('a narrow graph leaves out the hash and the author, and its menu says so', 
   await page.getByRole('menuitemcheckbox', { name: 'Date' }).click();
   await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'AUTHOR']);
 });
+
+test('the counts of files and lines are off, and read from git only once switched on', async ({ page }) => {
+  // What the page asks the host about commits' counts.
+  const asked: { lines: boolean }[] = [];
+  page.on('websocket', (socket) =>
+    socket.on('framesent', (frame) => {
+      const text = String(frame.payload);
+      if (text.includes('"log.stats"')) asked.push({ lines: /"lines":true/.test(text) });
+    }),
+  );
+  await open(page);
+  const row = graphRow(page, 'Add dark mode toggle');
+  const cellsOf = (text: string) => inScreenOrder(graphRow(page, text).getByRole('gridcell'));
+
+  // Off as they come: no heading, and nothing read.
+  expect(await headings(page)).toEqual(['COMMIT MESSAGE', 'AUTHOR', 'DATE', 'COMMIT']);
+  await heading(page, 'Date').click({ button: 'right' });
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Lines changed', checked: false })).toBeVisible();
+  expect(asked).toEqual([]);
+
+  // The files: their counts come in, and no lines are read for them.
+  await page.getByRole('menuitemcheckbox', { name: 'Files changed', checked: false }).click();
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'AUTHOR', 'DATE', 'COMMIT', 'FILES']);
+  await expect(row.getByRole('gridcell').last()).toHaveText('+1');
+  expect((await cellsOf('Update dependencies')).at(-1)).toBe('~2');
+  expect(asked.length).toBeGreaterThan(0);
+  expect(asked.every((request) => !request.lines)).toBe(true);
+  // The exact counts, in words, on the cell.
+  await row.getByRole('gridcell').last().hover();
+  await expect(row.getByRole('gridcell').last()).toHaveAttribute('title', '1 file: 1 added');
+
+  // The lines too.
+  await page.getByRole('button', { name: 'View options' }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Lines changed', checked: false }).click();
+  await page.keyboard.press('Escape');
+  await expect
+    .poll(() => headings(page))
+    .toEqual(['COMMIT MESSAGE', 'AUTHOR', 'DATE', 'COMMIT', 'FILES', 'LINES']);
+  await expect(row.getByRole('gridcell').last()).toHaveText('+1');
+  await row.getByRole('gridcell').last().hover();
+  await expect(row.getByRole('gridcell').last()).toHaveAttribute('title', '1 line added');
+  expect(asked.some((request) => request.lines)).toBe(true);
+  // A merge's counts are against its first parent, as its file list is.
+  const merge = graphRow(page, "Merge branch 'feature/login'");
+  await expect(merge.getByRole('gridcell').nth(-2)).toHaveText('+2');
+  await merge.getByRole('gridcell').nth(-2).hover();
+  await expect(merge.getByRole('gridcell').nth(-2)).toHaveAttribute(
+    'title',
+    '2 files: 2 added (against the first parent)',
+  );
+  // The uncommitted changes are no commit: they have none.
+  expect((await cellsOf('Uncommitted changes')).at(-1)).toBe('now');
+
+  // Kept for next time, and the usual columns leave them out again.
+  await page.reload();
+  await expect(row.getByRole('gridcell').last()).toHaveText('+1');
+  await heading(page, 'Lines').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Reset columns' }).click();
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'AUTHOR', 'DATE', 'COMMIT']);
+});
+
+test('a narrow graph leaves out the counts first, and reads none of them', async ({ page }) => {
+  const asked: string[] = [];
+  page.on('websocket', (socket) =>
+    socket.on('framesent', (frame) => {
+      const text = String(frame.payload);
+      if (text.includes('"log.stats"')) asked.push(text);
+    }),
+  );
+  await open(page);
+  await heading(page, 'Date').click({ button: 'right' });
+  await page.getByRole('menuitemcheckbox', { name: 'Lines changed', checked: false }).click();
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'AUTHOR', 'DATE', 'COMMIT', 'LINES']);
+  await expect(graphRow(page, 'Add dark mode toggle').getByRole('gridcell').last()).toHaveText('+1');
+
+  // Too narrow for them: the column goes, and a reloaded graph asks git nothing for it.
+  await page.setViewportSize({ width: 760, height: 520 });
+  await expect.poll(() => headings(page)).toEqual(['COMMIT MESSAGE', 'DATE']);
+  asked.length = 0;
+  await page.reload();
+  await expect(graphRow(page, 'Add dark mode toggle')).toBeVisible();
+  expect(await headings(page)).toEqual(['COMMIT MESSAGE', 'DATE']);
+  await heading(page, 'Date').click({ button: 'right' });
+  await page.getByRole('menuitemcheckbox', { name: 'Lines changed', checked: true }).hover();
+  await expect(page.getByText('Shown when the graph is wider')).toBeVisible();
+  expect(asked).toEqual([]);
+});

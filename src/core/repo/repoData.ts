@@ -2,6 +2,7 @@ import type {
   ChangedFile,
   CommitDetails,
   CommitMeta,
+  CommitStats,
   CompareSummary,
   HeadInfo,
   RefInfo,
@@ -19,6 +20,7 @@ import { filePaths, revisions } from '../git/args';
 import { CatFileReader } from '../git/catFile';
 import { searchArgs } from '../log/revList';
 import { bodyOf, parseCommit, subjectOf, type RawCommit } from '../parsers/commit';
+import { COMMIT_STATS_FLAGS, COMMIT_STATS_LINES_FLAG, parseCommitStats } from '../parsers/commitStats';
 import { parseRawNumstat } from '../parsers/diff';
 import {
   composeRefRecords,
@@ -53,6 +55,8 @@ export function emptyTree(objectFormat: 'sha1' | 'sha256'): string {
 const DIFF_FLAGS = ['-z', '--raw', '--numstat', '-M', '--no-ext-diff', '--no-textconv', '--no-abbrev'];
 
 const META_CACHE_SIZE = 20_000;
+/** Commits whose file and line counts are remembered (a few numbers each). */
+const STATS_CACHE_SIZE = 50_000;
 
 /** Objects remembered for reading refs (a tag-heavy repository has tens of thousands). */
 const REF_OBJECTS_LIMIT = 200_000;
@@ -63,6 +67,8 @@ const REF_OBJECTS_READ_MAX = 300;
 export class RepoData {
   private reader: CatFileReader | undefined;
   private readonly metaCache = new Map<string, CommitMeta>();
+  /** What commits changed, as far as it was read (with or without lines): commits are immutable. */
+  private readonly statsCache = new Map<string, CommitStats>();
   /** Type, peeled object and date of the objects refs point to (immutable per object ID). */
   private readonly refObjects = new Map<string, RefObject>();
   /** A full read of every ref's object in progress: reads starting meanwhile wait, then go fast. */
@@ -294,6 +300,50 @@ export class RepoData {
   }
 
   /**
+   * How much commits changed, for the graph's Files and Lines columns: files added, changed and
+   * removed against the first parent and, with `lines`, their lines (git then reads the files'
+   * contents, which takes many times longer). One git process reads all that is not remembered;
+   * commits that are not in the repository are left out.
+   */
+  async commitStats(shas: readonly string[], lines: boolean, signal?: AbortSignal): Promise<CommitStats[]> {
+    const known = (sha: string) => {
+      const stats = this.statsCache.get(sha);
+      return stats && (!lines || stats.lines) ? stats : undefined;
+    };
+    const missing = [...new Set(shas.filter((sha) => !known(sha)))];
+    // Their parents say what a merge is compared with, and which commits the repository has
+    // (git stops at one it does not have). The graph read them already for the rows it shows.
+    const metas = missing.length > 0 ? await this.commitMetas(missing) : [];
+    if (metas.length > 0) {
+      const { stdout } = await this.repo.git(
+        ['diff-tree', ...COMMIT_STATS_FLAGS, ...(lines ? [COMMIT_STATS_LINES_FLAG] : [])],
+        {
+          // A merge's line names the parent to compare it with: its first.
+          stdin: metas
+            .map((meta) => (meta.parents.length > 1 ? `${meta.sha} ${meta.parents[0]}\n` : `${meta.sha}\n`))
+            .join(''),
+          readOnly: true,
+          background: true,
+          label: lines ? 'Lines changed by commits' : 'Files changed by commits',
+          signal,
+        },
+      );
+      for (const stats of parseCommitStats(stdout, lines)) {
+        // Read again, a commit is the newest remembered.
+        this.statsCache.delete(stats.sha);
+        this.statsCache.set(stats.sha, stats);
+      }
+      while (this.statsCache.size > STATS_CACHE_SIZE) {
+        this.statsCache.delete(this.statsCache.keys().next().value as string);
+      }
+    }
+    return shas.flatMap((sha) => {
+      const stats = known(sha);
+      return stats ? [stats] : [];
+    });
+  }
+
+  /**
    * Files changed between two revisions. `base` undefined means the empty tree; `target` may be
    * 'WORKTREE' (files on disk) or 'INDEX' (staged), and `base` may be 'INDEX' for unstaged changes.
    */
@@ -424,5 +474,6 @@ export class RepoData {
     this.reader?.dispose();
     this.reader = undefined;
     this.metaCache.clear();
+    this.statsCache.clear();
   }
 }

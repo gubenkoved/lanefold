@@ -5,10 +5,16 @@
  */
 
 /** A column of the graph after the lanes. */
-export type ColumnId = 'message' | 'author' | 'date' | 'sha';
+export type ColumnId = 'message' | 'author' | 'date' | 'sha' | 'files' | 'lines';
 
 /** Every column, in the order they come in. */
-export const COLUMN_IDS: readonly ColumnId[] = ['message', 'author', 'date', 'sha'];
+export const COLUMN_IDS: readonly ColumnId[] = ['message', 'author', 'date', 'sha', 'files', 'lines'];
+
+/**
+ * Columns that are off until switched on: how many files and lines each commit changed. git is
+ * asked for them only while they show (see commitStats.ts), the lines costing the most.
+ */
+export const OPTIONAL_COLUMNS: readonly ColumnId[] = ['files', 'lines'];
 
 export interface GraphColumns {
   /** Every column, in the order shown (a column switched off keeps its place for when it is back). */
@@ -17,7 +23,7 @@ export interface GraphColumns {
   readonly hidden: readonly ColumnId[];
 }
 
-export const DEFAULT_COLUMNS: GraphColumns = { order: COLUMN_IDS, hidden: [] };
+export const DEFAULT_COLUMNS: GraphColumns = { order: COLUMN_IDS, hidden: OPTIONAL_COLUMNS };
 
 /** What the column headings say. */
 export const COLUMN_HEADINGS: Readonly<Record<ColumnId, string>> = {
@@ -25,6 +31,8 @@ export const COLUMN_HEADINGS: Readonly<Record<ColumnId, string>> = {
   author: 'Author',
   date: 'Date',
   sha: 'Commit',
+  files: 'Files',
+  lines: 'Lines',
 };
 
 /** What menus call the columns (out of the heading's context, "Commit" alone says too little). */
@@ -33,6 +41,8 @@ export const COLUMN_NAMES: Readonly<Record<ColumnId, string>> = {
   author: 'Author',
   date: 'Date',
   sha: 'Commit hash',
+  files: 'Files changed',
+  lines: 'Lines changed',
 };
 
 /** Widths (px) of the columns after the lanes; the message takes the room that is left. */
@@ -40,12 +50,15 @@ export const COLUMN_WIDTHS: Readonly<Record<Exclude<ColumnId, 'message'>, number
   author: 168,
   date: 104,
   sha: 84,
+  // Three counts (added, changed, removed) and two, of five characters at most each ("+1.4K").
+  files: 132,
+  lines: 96,
 };
 
 /** Room (px) the message and narrow lanes keep: columns are left out of a graph with less. */
 const MESSAGE_ROOM = 364;
-/** What a narrow graph leaves out first: the hash, then the author (the date stays). */
-const DROPPED_FIRST: readonly ColumnId[] = ['sha', 'author'];
+/** What a narrow graph leaves out first: the counts, the hash, then the author (the date stays). */
+const DROPPED_FIRST: readonly ColumnId[] = ['lines', 'files', 'sha', 'author'];
 
 export function isColumnId(value: unknown): value is ColumnId {
   return typeof value === 'string' && (COLUMN_IDS as readonly string[]).includes(value);
@@ -53,7 +66,8 @@ export function isColumnId(value: unknown): value is ColumnId {
 
 /**
  * Columns as stored (maybe by another version, maybe garbled): what is valid of them. Columns it
- * does not name (newer ones) come last, shown; anything unusable gives the usual columns.
+ * does not name (newer ones) come last, shown or not as they usually are; anything unusable gives
+ * the usual columns.
  */
 export function parseColumns(value: unknown): GraphColumns {
   if (!value || typeof value !== 'object') return DEFAULT_COLUMNS;
@@ -62,9 +76,13 @@ export function parseColumns(value: unknown): GraphColumns {
   const named = order.filter((id, index): id is ColumnId => isColumnId(id) && order.indexOf(id) === index);
   return {
     order: [...named, ...COLUMN_IDS.filter((id) => !named.includes(id))],
-    hidden: Array.isArray(hidden)
-      ? COLUMN_IDS.filter((id) => id !== 'message' && (hidden as unknown[]).includes(id))
-      : [],
+    hidden: COLUMN_IDS.filter(
+      (id) =>
+        id !== 'message' &&
+        (named.includes(id)
+          ? Array.isArray(hidden) && (hidden as unknown[]).includes(id)
+          : OPTIONAL_COLUMNS.includes(id)),
+    ),
   };
 }
 
@@ -123,7 +141,7 @@ export function shiftColumn(
 
 /**
  * The columns a graph `width` px wide leaves out for want of room, so that the message keeps
- * about 300px: the hash first, then the author.
+ * about 300px: the counts of lines and files first, then the hash, then the author.
  */
 export function droppedColumns(columns: GraphColumns, width: number): ReadonlySet<ColumnId> {
   const dropped = new Set<ColumnId>();

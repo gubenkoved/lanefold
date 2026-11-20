@@ -35,6 +35,12 @@
   text-overflow: ellipsis;
 }
 
+/* Counts are set to the right, under their heading. */
+.headerCell[data-column='files'],
+.headerCell[data-column='lines'] {
+  text-align: right;
+}
+
 /* A column's heading (not the lanes'): it has a menu, and is dragged sideways to move. */
 .headerCell:not([data-column='graph']) {
   align-self: stretch;
@@ -183,7 +189,11 @@
 .root[data-no-date] .date,
 .root[data-no-date] .headerCell[data-column='date'],
 .root[data-no-sha] .sha,
-.root[data-no-sha] .headerCell[data-column='sha'] {
+.root[data-no-sha] .headerCell[data-column='sha'],
+.root[data-no-files] .files,
+.root[data-no-files] .headerCell[data-column='files'],
+.root[data-no-lines] .lines,
+.root[data-no-lines] .headerCell[data-column='lines'] {
   display: none;
 }
 
@@ -405,11 +415,61 @@
   opacity: 0.85;
 }
 
-/* Skeletons while metadata pages in. */
+/*
+ * How many files and lines a commit changed: each count in a place of its own (wide enough for
+ * "+1.4K"), so that rows line up whatever their sizes.
+ */
+.stats {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: var(--lf-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.count {
+  flex: 0 0 38px;
+  text-align: right;
+}
+
+.countAdded {
+  color: var(--lf-added-text);
+}
+
+.countModified {
+  color: var(--lf-modified-text);
+}
+
+.countRemoved {
+  color: var(--lf-deleted-text);
+}
+
+/* Nothing of the kind ("0", "binary"): said quietly. */
+.count.countNone {
+  color: var(--lf-fg-muted);
+}
+
+/* On the selection's own color the counts keep their signs, not their colors. */
+.root:focus-within .row.selected .count {
+  color: inherit;
+}
+
+.root:focus-within .row.selected .count.countNone {
+  opacity: 0.85;
+}
+
+/* Until a commit's counts are read: a skeleton in their place, and no counts. */
+.statsLoading::after {
+  content: '';
+  flex: 0 0 44px;
+}
+
+/* Skeletons while metadata pages in, and while a commit's counts are read. */
 .loading .subject,
 .loading .authorName,
 .loading .date,
-.loading .sha {
+.loading .sha,
+.statsLoading::after {
   color: transparent;
   border-radius: 4px;
   background: linear-gradient(

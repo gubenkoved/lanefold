@@ -57,6 +57,12 @@ if (typeof window !== 'undefined') {
 
 // ---- menus -----------------------------------------------------------------------------------
 
+/** What the columns that cost something to show say of themselves. */
+const COLUMN_HINTS: Readonly<Partial<Record<ColumnId, string>>> = {
+  files: 'Files added, changed and removed; read for the commits in view',
+  lines: 'Lines added and removed; read for the commits in view',
+};
+
 /**
  * A checkable item per column, in their order: the message (always shown) with `message`, and
  * `dropped` ones (left out of a narrow graph) saying so.
@@ -79,7 +85,10 @@ export function columnToggleEntries(
         checked: shown,
         disabled: id === 'message',
         reason: 'The commit message always shows',
-        hint: shown && options.dropped?.has(id) ? 'Shown when the graph is wider' : options.hint,
+        hint:
+          shown && options.dropped?.has(id)
+            ? 'Shown when the graph is wider'
+            : (COLUMN_HINTS[id] ?? options.hint),
         onSelect: () => setGraphColumns(toggleColumn(useGraphColumns.getState().columns, id)),
       };
     });
@@ -139,7 +148,7 @@ export function columnMenuEntries(
       icon: 'discard',
       disabled: isDefaultColumns(columns),
       reason: 'The columns are as they come',
-      hint: 'Every column, in the usual order',
+      hint: 'The usual columns, in the usual order',
       onSelect: () => setGraphColumns(DEFAULT_COLUMNS),
     },
   );

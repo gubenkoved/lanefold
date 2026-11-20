@@ -5,6 +5,7 @@ import type {
   ChangedFile,
   CommitDetails,
   CommitMeta,
+  CommitStats,
   CompareSummary,
   ConsoleEntry,
   DiffSide,
@@ -155,6 +156,12 @@ export interface HostApi {
   'log.close'(params: { logId: number }): void;
   /** Metadata for graph rows (missing commits are omitted). */
   'log.meta'(params: { repoId: string; shas: readonly string[] }): readonly CommitMeta[];
+  /**
+   * How much commits changed, for the graph's Files and Lines columns (missing commits are
+   * omitted). Counting lines reads the files' contents, which takes many times longer than
+   * counting files: it is asked for with `lines` only.
+   */
+  'log.stats'(params: { repoId: string; shas: readonly string[]; lines?: boolean }): readonly CommitStats[];
   /** Commits in a view's scope matching a search (newest first, capped at `limit`). */
   'log.search'(params: {
     repoId: string;

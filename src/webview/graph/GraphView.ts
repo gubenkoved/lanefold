@@ -1,4 +1,4 @@
-import type { AnimationLevel, Density, RefInfo } from '../../shared/models';
+import type { AnimationLevel, CommitStats, Density, RefInfo } from '../../shared/models';
 import {
   COLUMN_HEADINGS,
   COLUMN_IDS,
@@ -12,7 +12,17 @@ import {
   type ColumnId,
   type GraphColumns,
 } from './columns';
-import { absoluteTime, initials, relativeTime, shortSha, stringHash } from './format';
+import {
+  absoluteTime,
+  compactCount,
+  filesChangedText,
+  initials,
+  linesChangedText,
+  relativeTime,
+  shortSha,
+  stringHash,
+} from './format';
+import type { StatsWant } from './commitStats';
 import type { LogModel, RowSource } from './logModel';
 import { recentRenames } from './renames';
 import { paintGraph, RowFlag } from './painter';
@@ -116,6 +126,10 @@ interface Slot {
   readonly authorName: HTMLSpanElement;
   readonly date: HTMLDivElement;
   readonly sha: HTMLDivElement;
+  /** The Files column's counts: added, changed, removed. */
+  readonly fileCounts: readonly [HTMLSpanElement, HTMLSpanElement, HTMLSpanElement];
+  /** The Lines column's counts: added, removed. */
+  readonly lineCounts: readonly [HTMLSpanElement, HTMLSpanElement];
   /** The cells of the columns after the lanes (reordered with the columns). */
   readonly cells: Readonly<Record<ColumnId, HTMLDivElement>>;
   row: number;
@@ -227,6 +241,8 @@ export class GraphView {
   /** The columns on screen, in order, and those a narrow graph leaves out (see applyColumns). */
   private visible: readonly ColumnId[] = [];
   private dropped: ReadonlySet<ColumnId> = new Set();
+  /** The counts the columns on screen show of each commit (none unless switched on). */
+  private statsWanted: StatsWant = 'none';
   /** The order the cells are in (the DOM follows the screen, for screen readers). */
   private cellOrder = '';
   /** The heading Tab reaches: the arrow keys move between them. */
@@ -267,6 +283,8 @@ export class GraphView {
       author: heading('author'),
       date: heading('date'),
       sha: heading('sha'),
+      files: heading('files'),
+      lines: heading('lines'),
     };
     this.header.append(...options.columns.order.map((id) => this.headerCells[id]));
     this.setHeaderFocus('message');
@@ -583,6 +601,7 @@ export class GraphView {
     const visible = visibleColumns(columns, this.dropped);
     if (visible.join() !== this.visible.join()) {
       this.visible = visible;
+      this.statsWanted = visible.includes('lines') ? 'lines' : visible.includes('files') ? 'files' : 'none';
       for (const id of COLUMN_IDS) this.root.toggleAttribute(`data-no-${id}`, !visible.includes(id));
       this.root.style.setProperty('--lf-cols', gridTemplate(visible));
       // Tab reaches a heading on screen.
@@ -690,6 +709,8 @@ export class GraphView {
       model.ensureLayout(last + 1);
       model.requestMeta(first, last);
     }
+    // What commits changed is read only while a column shows it (a narrow graph leaves them out).
+    model.requestStats(first, last, last < 0 ? 'none' : this.statsWanted);
 
     animating = this.updateGraphWidth(first, last) || animating;
     const transitionT = this.transitionProgress();
@@ -852,9 +873,20 @@ export class GraphView {
       author.append(avatar, authorName);
       const date = el('div', `${styles.cell} ${styles.date}`);
       const sha = el('div', `${styles.cell} ${styles.sha}`);
-      const cells = { message, author, date, sha };
+      const count = (tone: string) => el('span', `${styles.count} ${tone}`);
+      const files = el('div', `${styles.cell} ${styles.stats} ${styles.files}`);
+      const fileCounts = [
+        count(styles.countAdded!),
+        count(styles.countModified!),
+        count(styles.countRemoved!),
+      ] as const;
+      files.append(...fileCounts);
+      const lines = el('div', `${styles.cell} ${styles.stats} ${styles.lines}`);
+      const lineCounts = [count(styles.countAdded!), count(styles.countRemoved!)] as const;
+      lines.append(...lineCounts);
+      const cells = { message, author, date, sha, files, lines };
       row.append(graph, ...this.options.columns.order.map((id) => cells[id]));
-      for (const cell of [graph, message, author, date, sha]) cell.setAttribute('role', 'gridcell');
+      for (const cell of [graph, ...Object.values(cells)]) cell.setAttribute('role', 'gridcell');
       this.rowsLayer.append(row);
       this.slots.push({
         el: row,
@@ -865,6 +897,8 @@ export class GraphView {
         authorName,
         date,
         sha,
+        fileCounts,
+        lineCounts,
         cells,
         row: -1,
         shownSha: '',
@@ -996,6 +1030,7 @@ export class GraphView {
     slot.subject.className = styles.subject!;
     slot.subject.textContent = meta?.subject ?? '';
     slot.sha.textContent = shortSha(sha);
+    if (this.statsWanted !== 'none') this.fillStats(slot, model.statsOf(sha));
     if (meta) {
       slot.authorName.textContent = meta.author;
       slot.avatar.textContent = initials(meta.author);
@@ -1015,6 +1050,42 @@ export class GraphView {
       delete slot.date.dataset.time;
       slot.el.title = '';
     }
+  }
+
+  /**
+   * The Files and Lines cells of a commit: its counts, shortened ("1.4K") in a place of their own
+   * each so that rows line up; a skeleton until they are read. `stats` 'none': a row without any
+   * (the uncommitted changes).
+   */
+  private fillStats(slot: Slot, stats: CommitStats | undefined | 'none'): void {
+    const known = stats === 'none' ? undefined : stats;
+    const { files, lines } = slot.cells;
+    // Their exact counts are worded on hover (see titleStats).
+    files.removeAttribute('title');
+    lines.removeAttribute('title');
+    const signed = (sign: string, value: number) => (value > 0 ? `${sign}${compactCount(value)}` : '');
+
+    const [added, modified, removed] = slot.fileCounts;
+    const noFiles = !!known && known.added + known.modified + known.removed === 0;
+    files.classList.toggle(styles.statsLoading!, stats === undefined);
+    added.textContent = known ? signed('+', known.added) : '';
+    modified.textContent = known ? signed('~', known.modified) : '';
+    removed.textContent = noFiles ? '0' : known ? signed('\u2212', known.removed) : '';
+    removed.classList.toggle(styles.countNone!, noFiles);
+
+    const [linesAdded, linesRemoved] = slot.lineCounts;
+    const counted = known?.lines;
+    const noLines = !!counted && counted.added + counted.removed === 0;
+    lines.classList.toggle(styles.statsLoading!, stats !== 'none' && !counted);
+    linesAdded.textContent = counted ? signed('+', counted.added) : '';
+    linesRemoved.textContent = !counted
+      ? ''
+      : !noLines
+        ? signed('\u2212', counted.removed)
+        : counted.binary > 0
+          ? 'binary'
+          : '0';
+    linesRemoved.classList.toggle(styles.countNone!, noLines);
   }
 
   /** Shows a row's repository: a stripe in its color, its name on hover and for screen readers. */
@@ -1066,6 +1137,7 @@ export class GraphView {
     slot.date.removeAttribute('title');
     delete slot.date.dataset.time;
     slot.sha.textContent = '';
+    this.fillStats(slot, 'none');
   }
 
   private fillRefs(model: LogModel, slot: Slot, row: number): void {
@@ -1347,6 +1419,7 @@ export class GraphView {
     this.rowsLayer.addEventListener('pointerover', (event) => {
       const cell = (event.target as HTMLElement).closest<HTMLElement>(`.${styles.date}`);
       if (cell?.dataset.time && !cell.title) cell.title = absoluteTime(Number(cell.dataset.time));
+      this.titleStats(event);
     });
     this.rowsLayer.addEventListener('dblclick', (event) => {
       const row = this.rowFromEvent(event);
@@ -1407,6 +1480,20 @@ export class GraphView {
       const ratio = (event.clientY - rect.top) / rect.height;
       this.scrollTo(ratio * this.model.rowCount * this.rowHeight - this.viewportHeight / 2, true);
     });
+  }
+
+  /** Words a pointed-at Files or Lines cell's exact counts (too slow to format for every row). */
+  private titleStats(event: Event): void {
+    const cell = (event.target as HTMLElement).closest<HTMLElement>(`.${styles.stats}`);
+    if (!cell || cell.title || !this.model) return;
+    const row = Number(cell.closest<HTMLElement>('[data-row]')?.dataset.row ?? -1);
+    const stats = row >= 0 ? this.model.statsOf(this.model.sha(row)) : undefined;
+    if (!stats) return;
+    const merge = this.model.isMerge(row);
+    const text = cell.classList.contains(styles.files!)
+      ? filesChangedText(stats, merge)
+      : stats.lines && linesChangedText(stats.lines, merge);
+    if (text) cell.title = text;
   }
 
   private openColumnsMenu(column: ColumnId | undefined, anchor: Element | { x: number; y: number }): void {

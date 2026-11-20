@@ -34,7 +34,15 @@ import { readWorktrees } from '../repo/worktrees';
 import { checkLineCounting, checkStatsQuery, checkStatsScope, StatsService } from '../stats/repoStats';
 import { DisposableStore, Emitter, type Disposable } from '../util/emitter';
 import { paths } from '../util/paths';
-import { checkCount, checkFilePaths, checkObjectId, checkOneOf, checkRev, checkWebUrl } from './params';
+import {
+  checkCount,
+  checkFilePaths,
+  checkObjectId,
+  checkObjectIds,
+  checkOneOf,
+  checkRev,
+  checkWebUrl,
+} from './params';
 import type { Platform } from './platform';
 import { openReposLog } from './reposLog';
 
@@ -366,6 +374,8 @@ export class Backend implements Disposable {
         streams?.delete(logId);
       },
       'log.meta': ({ repoId, shas }) => this.data(repoId).commitMetas(shas),
+      'log.stats': ({ repoId, shas, lines }, { signal }) =>
+        this.data(repoId).commitStats(checkObjectIds(shas, 500), lines === true, signal),
       'log.search': async ({ repoId, view, query, limit }, { signal }) => {
         const data = this.data(repoId);
         const head = await data.head({ shared: true });

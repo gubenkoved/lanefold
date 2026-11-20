@@ -26,6 +26,13 @@ export function checkObjectId(value: unknown): string {
   return value;
 }
 
+/** Full object IDs, `max` of them at most (they go to git on its standard input, a line each). */
+export function checkObjectIds(value: unknown, max: number): readonly string[] {
+  if (!Array.isArray(value) || !value.every(isObjectId)) throw new Error('Not a list of object IDs.');
+  if (value.length > max) throw new Error(`Too many object IDs: ${value.length} (${max} at most).`);
+  return value;
+}
+
 /** One of `allowed`; `fallback` when none was given. */
 export function checkOneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   if (value === undefined || value === null) return fallback;

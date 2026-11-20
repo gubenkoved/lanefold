@@ -1,11 +1,19 @@
 import { filterTopology } from '../../shared/graph/filter';
 import { GraphLayout } from '../../shared/graph/layout';
 import { GraphTopology, type TopologyChunk } from '../../shared/graph/topology';
-import type { CommitMeta, RefInfo, RefsSnapshot, ViewConfig, WorkingTreeSummary } from '../../shared/models';
+import type {
+  CommitMeta,
+  CommitStats,
+  RefInfo,
+  RefsSnapshot,
+  ViewConfig,
+  WorkingTreeSummary,
+} from '../../shared/models';
 import type { LogEnd } from '../../shared/protocol';
 import { errorText } from '../bridge/errorText';
 import type { HostRpc } from '../bridge/host';
 import { mark } from '../perf';
+import { CommitStatsLoader, statsCache, type StatsWant } from './commitStats';
 import { isWorkingTreeSha, stringHash } from './format';
 
 export type LogPhase = 'opening' | 'streaming' | 'ready' | 'error';
@@ -43,6 +51,11 @@ const META_BATCH = 250;
 const META_PREFETCH = 120;
 /** Rows whose metadata is requested as soon as the first chunk arrives. */
 const FIRST_SCREEN_ROWS = 60;
+/** Rows past the screen whose file counts are read ahead (below, where scrolling mostly goes, and above). */
+const STATS_AHEAD = 40;
+const STATS_BEHIND = 15;
+/** Rows past the screen whose line counts are read ahead: few, they cost the most. */
+const STATS_LINES_AHEAD = 8;
 
 /** The repository a row belongs to, in a log of several repositories (for its marker). */
 export interface RowSource {
@@ -72,6 +85,12 @@ export class LogModel {
   refsVersion = 0;
   /** Per-repository cache shared by every model (reloads, filters): commits are immutable. */
   protected readonly meta: Map<string, CommitMeta>;
+  /** What commits changed, as far as the graph's Files and Lines columns asked (see commitStats.ts). */
+  private readonly stats: Map<string, CommitStats>;
+  /** Made when one of those columns first shows. */
+  private statsLoader: CommitStatsLoader | undefined;
+  /** The rows and counts last asked for (the graph asks at every frame). */
+  private statsKey = '';
   /** Queued for the next request, and requested but not answered yet. */
   private pendingMeta = new Set<string>();
   private inflightMeta = new Set<string>();
@@ -93,6 +112,7 @@ export class LogModel {
     options: { stream?: boolean } = {},
   ) {
     this.meta = metaCache(repoId);
+    this.stats = statsCache(repoId);
     this.layout = this.createLayout();
     if (options.stream !== false) {
       this.unsubscribe.push(
@@ -461,6 +481,53 @@ export class LogModel {
     return this.rpc.call('log.meta', { repoId: this.repoId, shas });
   }
 
+  /** What a commit changed, once read; its lines only if the Lines column asked for them. */
+  statsOf(sha: string): CommitStats | undefined {
+    return this.stats.get(sha);
+  }
+
+  /**
+   * Has the counts read that the graph shows of rows `[first, last]` (and a few rows around):
+   * `want` is 'none' while neither the Files nor the Lines column shows, and nothing is read then.
+   */
+  requestStats(first: number, last: number, want: StatsWant): void {
+    const key = want === 'none' ? '' : `${first}:${last}:${want}:${this.topology.rowCount}`;
+    if (key === this.statsKey) return;
+    this.statsKey = key;
+    if (want === 'none') {
+      this.statsLoader?.want([], 0, 'none');
+      return;
+    }
+    const rows = this.topology.rowCount;
+    const shas: string[] = [];
+    const add = (from: number, to: number) => {
+      for (let row = Math.max(0, from); row <= Math.min(rows - 1, to); row++) {
+        const sha = this.sha(row);
+        if (!isWorkingTreeSha(sha)) shas.push(sha);
+      }
+    };
+    // Nearest first: the screen, the rows below it, then those above.
+    add(first, last + STATS_LINES_AHEAD);
+    const near = shas.length;
+    add(last + STATS_LINES_AHEAD + 1, last + STATS_AHEAD);
+    add(first - STATS_BEHIND, first - 1);
+    this.statsLoader ??= new CommitStatsLoader(
+      this.stats,
+      (list, lines, signal) => this.fetchStats(list, lines, signal),
+      () => this.notify(),
+    );
+    this.statsLoader.want(shas, near, want);
+  }
+
+  /** Reads what commits changed (missing ones are left out). */
+  protected fetchStats(
+    shas: readonly string[],
+    lines: boolean,
+    signal: AbortSignal,
+  ): Promise<readonly CommitStats[]> {
+    return this.rpc.call('log.stats', { repoId: this.repoId, shas, lines }, { signal });
+  }
+
   /** Row of a commit (full or abbreviated SHA), or -1. Full SHAs take constant time. */
   rowOf(sha: string): number {
     const needle = sha.toLowerCase();
@@ -572,6 +639,7 @@ export class LogModel {
     this.disposed = true;
     for (const off of this.unsubscribe) off();
     if (this.metaTimer) clearTimeout(this.metaTimer);
+    this.statsLoader?.dispose();
     if (this.logId !== undefined && this.phase === 'streaming') {
       void this.rpc.call('log.close', { logId: this.logId }).catch(() => undefined);
     }
