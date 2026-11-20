@@ -22,12 +22,15 @@ const hostCache = new Map<
 >();
 const HOSTS_TTL_MS = 30_000;
 
-/** The repository's code hosts, in the order links prefer them. */
-export function hostsOf(repo: Repository): Promise<CodeHost[]> {
+/**
+ * The repository's code hosts, in the order links prefer them. A link someone asks for reads
+ * them `fresh`: a remote set a moment ago is not in what was kept, until the change is noticed.
+ */
+export function hostsOf(repo: Repository, fresh = false): Promise<CodeHost[]> {
   const settings = readSettings().links;
   const key = JSON.stringify(settings.hosts);
   const cached = hostCache.get(repo.id);
-  if (cached && cached.key === key && Date.now() - cached.at < HOSTS_TTL_MS) return cached.hosts;
+  if (!fresh && cached && cached.key === key && Date.now() - cached.at < HOSTS_TTL_MS) return cached.hosts;
   const hosts = readCodeHosts(repo, settings).catch(() => []);
   hostCache.set(repo.id, { at: Date.now(), key, hosts });
   return hosts;
@@ -98,7 +101,7 @@ async function hostHaving(
 
 /** A link to a commit on the code host, or why there is none. */
 export async function commitLink(repo: Repository, sha: string): Promise<EditorLink> {
-  const hosts = await hostsOf(repo);
+  const hosts = await hostsOf(repo, true);
   if (hosts.length === 0) return { reason: noHost(repo) };
   const host = await hostHaving(repo, hosts, sha);
   const url = host && linkUrl(host, { kind: 'commit', sha });
@@ -117,7 +120,7 @@ export async function editorLink(
   const location = locateFile(registry, editor.document.uri);
   if (!location?.path) return { reason: 'This file is not in a repository Lanefold has open.' };
   const { repo, path: file } = location;
-  const hosts = await hostsOf(repo);
+  const hosts = await hostsOf(repo, true);
   if (hosts.length === 0) return { reason: noHost(repo) };
   const { selection } = editor;
   let start = selection.start.line + 1;
