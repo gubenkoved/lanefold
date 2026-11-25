@@ -197,8 +197,8 @@ glyph, `media/lanefold.svg`.
 
 The README's screenshots are in `media/`, and copies are in a
 [secret gist](https://gist.github.com/gubenkoved/66fff765499dc9a41fddfc132bbf5861) that the
-README links to, since the Marketplace cannot load images from this private repository. After
-changing a screenshot, push it to the gist too (`git clone https://gist.github.com/66fff765499dc9a41fddfc132bbf5861.git`).
+README links to. After changing a screenshot, push it to the gist too
+(`git clone https://gist.github.com/66fff765499dc9a41fddfc132bbf5861.git`).
 
 ### Architecture
 
