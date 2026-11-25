@@ -69,11 +69,14 @@
   border-top: 1px solid var(--lf-hairline);
 }
 
+/*
+ * One line, whatever the buttons say: their labels grow as lines are picked ("Stage 2 lines"), and
+ * a bar that wrapped would move the lines under the mouse in the middle of a drag.
+ */
 .bar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 2px 6px;
+  gap: 6px;
   min-height: 26px;
   padding: 2px 4px 2px 8px;
   border-bottom: 1px solid var(--lf-hairline);
@@ -83,8 +86,12 @@
   font-size: var(--lf-text-xs);
 }
 
+/* Gives way to the buttons when there is no room left (whole in its tooltip). */
 .range {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

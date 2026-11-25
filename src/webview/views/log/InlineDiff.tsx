@@ -653,7 +653,11 @@ function Hunk({
   return (
     <div className={styles.hunk}>
       <div className={styles.bar}>
-        <span className={styles.range} id={rangeId}>
+        <span
+          className={styles.range}
+          id={rangeId}
+          title={`@@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@`}
+        >
           @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
         </span>
         <span className={styles.section}>{hunk.section}</span>
