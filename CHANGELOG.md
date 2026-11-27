@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.0
+
+- Rebase onto a branch with the commits arranged first. The history editor opens on the commits
+  that branch lacks, to drop, squash, reorder or reword before they are replayed
+  (`git rebase -i --onto`).
+  - It opens from Rebase Interactively onto… in the Command Palette, from Rebase interactively…
+    under each Rebase in the graph's menus, and from Arrange commits first… in the review of a
+    plain rebase.
+  - The command's picker lists recently used branches first, then the other branches by their
+    last commit, then the remote branches. A tag or a commit hash can be typed.
+  - Commits the target already has as other commits start out dropped, and say so: after an
+    upstream was rewritten, they are the ones that are not the branch's own.
+  - Conflicts are predicted against the target, step by step, and Undo puts the branch back.
+  - A branch that already contains the target edits its commits after it, as before. One with no
+    commits of its own is moved forward.
+- Commands go to the Lanefold view in use. From the Command Palette, they always opened the
+  bottom panel, with Lanefold in front in an editor tab too.
+  - A view on screen takes them: the one used last when the panel and an editor tab both show.
+  - With none on screen, the view used last is brought forward. The panel opens only when there
+    is neither.
+  - Lanefold: Open and its shortcut follow the same rule.
+- A hunk's bar stays on one line as lines are picked. It wrapped when a button's label grew, and
+  moved the lines under the mouse in the middle of a drag. Its range gives way, whole on hover.
+- Copy Permalink, Open on Remote and a blamed commit's page work right after a remote is added or
+  its URL set. For up to half a minute they said no remote is on a code host.
+
 ## 0.3.0
 
 - Two more columns in the commit graph, off until you switch them on (right-click a column
