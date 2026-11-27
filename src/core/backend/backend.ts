@@ -87,9 +87,14 @@ export class Backend implements Disposable {
   /** Open log streams per webview, cancelled when the webview goes away. */
   private readonly logStreams = new Map<HostEndpoint, Map<number, LogStream>>();
   private readonly transports = new Map<HostEndpoint, RpcTransport>();
+  /** How each view's host brings it forward, with keyboard focus (a view that can be). */
+  private readonly reveals = new Map<HostEndpoint, () => void>();
   /** The main view (the panel), which host commands fall back to. */
   private primary: HostEndpoint | undefined;
-  /** The view that had focus last: commands such as Undo act there, and only there. */
+  /**
+   * The view that had focus last, on screen or not: commands such as Undo act there, and only
+   * there, and a command that needs a view brings it back when none is on screen.
+   */
   private lastFocused: HostEndpoint | undefined;
   /** Commits read for the Statistics view, kept per repository for a while. */
   private readonly stats = new StatsService({
@@ -137,9 +142,13 @@ export class Backend implements Disposable {
 
   /**
    * Attaches a webview; the returned endpoint is disposed by {@link disconnect}. The `primary`
-   * view (the panel) is where host commands go when no other view is focused.
+   * view (the panel) is where host commands go when no other view is in use; `reveal` brings the
+   * view forward with keyboard focus (see {@link showView}).
    */
-  connect(transport: RpcTransport, options: { readonly primary?: boolean } = {}): HostEndpoint {
+  connect(
+    transport: RpcTransport,
+    options: { readonly primary?: boolean; readonly reveal?: () => void } = {},
+  ): HostEndpoint {
     this.logEngine.warmUp();
     const endpoint: HostEndpoint = new RpcEndpoint(transport);
     endpoint.implement(this.handlers(endpoint));
@@ -152,6 +161,7 @@ export class Backend implements Disposable {
     });
     this.endpoints.add(endpoint);
     this.transports.set(endpoint, transport);
+    if (options.reveal) this.reveals.set(endpoint, options.reveal);
     if (options.primary) this.primary = endpoint;
     return endpoint;
   }
@@ -162,6 +172,7 @@ export class Backend implements Disposable {
     this.endpoints.delete(endpoint);
     this.ready.delete(endpoint);
     this.transports.delete(endpoint);
+    this.reveals.delete(endpoint);
     if (this.primary === endpoint) this.primary = undefined;
     if (this.lastFocused === endpoint) this.lastFocused = undefined;
     endpoint.dispose();
@@ -181,22 +192,52 @@ export class Backend implements Disposable {
     for (const endpoint of this.endpoints) endpoint.emit(event, payload);
   }
 
+  /** Whether a view is connected and ready for commands. */
+  private usable(endpoint: HostEndpoint | undefined): endpoint is HostEndpoint {
+    return endpoint !== undefined && this.ready.has(endpoint);
+  }
+
+  /** The view a command goes to among those on screen: the focused one, else the primary, else any. */
+  private onScreen(): HostEndpoint | undefined {
+    return [this.lastFocused, this.primary, ...this.ready].find(
+      (endpoint): endpoint is HostEndpoint =>
+        this.usable(endpoint) && this.transports.get(endpoint)?.visible !== false,
+    );
+  }
+
+  /**
+   * The view in use, where a command that needs a view goes: one on screen (see
+   * {@link sendCommand}), so that nothing moves while Lanefold is in sight; else the view that
+   * had focus last, wherever it is hidden. Undefined when there is neither: the host opens the
+   * primary view then.
+   */
+  viewInUse(): HostEndpoint | undefined {
+    return this.onScreen() ?? (this.usable(this.lastFocused) ? this.lastFocused : undefined);
+  }
+
+  /** Whether `endpoint` is the primary view (the panel) rather than one popped out of it. */
+  isPrimary(endpoint: HostEndpoint): boolean {
+    return endpoint === this.primary;
+  }
+
+  /** Brings a view forward, with keyboard focus (what its host does for it; nothing without one). */
+  showView(endpoint: HostEndpoint): void {
+    this.reveals.get(endpoint)?.();
+  }
+
   /**
    * Runs a command in one view, never in several (an Undo must undo once): the focused view if
    * it is on screen, else the primary one, else any view on screen. With `to: 'primary'` only
-   * the primary view qualifies (it may still be opening). Returns whether a view took it.
+   * the primary view qualifies (it may still be opening); a view given as `to` takes it itself
+   * (hidden, it runs once shown). Returns whether a view took it.
    */
-  sendCommand(command: string, args?: unknown, to: 'focused' | 'primary' = 'focused'): boolean {
-    const usable = (endpoint: HostEndpoint | undefined): endpoint is HostEndpoint =>
-      endpoint !== undefined && this.ready.has(endpoint);
-    const onScreen = (endpoint: HostEndpoint | undefined): endpoint is HostEndpoint =>
-      usable(endpoint) && this.transports.get(endpoint)?.visible !== false;
-    const target =
-      to === 'primary'
-        ? usable(this.primary)
-          ? this.primary
-          : undefined
-        : [this.lastFocused, this.primary, ...this.ready].find(onScreen);
+  sendCommand(
+    command: string,
+    args?: unknown,
+    to: 'focused' | 'primary' | HostEndpoint = 'focused',
+  ): boolean {
+    const candidate = to === 'focused' ? this.onScreen() : to === 'primary' ? this.primary : to;
+    const target = this.usable(candidate) ? candidate : undefined;
     target?.emit('command.run', { command, args });
     return target !== undefined;
   }

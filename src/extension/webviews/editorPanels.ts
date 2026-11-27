@@ -56,6 +56,8 @@ export class EditorPanels implements vscode.Disposable {
       onTitle: (title) => {
         panel.title = title;
       },
+      // Where it is: in front of its editor group, not moved to another.
+      reveal: () => panel.reveal(undefined, false),
     });
   }
 

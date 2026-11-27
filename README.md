@@ -116,6 +116,10 @@ Open it with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>G</kbd> (<kbd>Cmd</kbd>+<kbd>Al
 on macOS) or run **Lanefold: Open** from the Command Palette. Every command is under
 **Lanefold:** there.
 
+Lanefold lives in the bottom panel, and **Lanefold: Open in Editor Tab** gives it a full-size tab.
+Commands go to the view in use: one that is on screen (the one used last, when both are), else
+the one used last, brought forward. The panel opens only when there is neither.
+
 ### Keyboard
 
 | Where          | Keys                                                                                                                                                                                                                             |

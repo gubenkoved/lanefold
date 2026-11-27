@@ -25,6 +25,8 @@ export function attachWebview(options: {
   readonly onTitle?: (title: string) => void;
   /** The main view (the panel): host commands fall back to it. */
   readonly primary?: boolean;
+  /** Brings the view forward with keyboard focus (a command goes to the view in use). */
+  readonly reveal: () => void;
 }): vscode.Disposable {
   const { webview, backend } = options;
   webview.options = webviewOptions(options.extensionUri);
@@ -33,7 +35,7 @@ export function attachWebview(options: {
   });
 
   const transport = new WebviewTransport(webview, options.visibility);
-  const endpoint = backend.connect(transport, { primary: options.primary });
+  const endpoint = backend.connect(transport, { primary: options.primary, reveal: options.reveal });
   const offFocus = endpoint.on('ui.focus', ({ focused, graphFocused }) => {
     // A view that lost focus only clears the key if no other view took focus since.
     if (focused) contextOwner = endpoint;

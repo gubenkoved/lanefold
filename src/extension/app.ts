@@ -138,7 +138,8 @@ export class LanefoldApp implements vscode.Disposable {
     const command = (id: string, run: (...args: unknown[]) => unknown) =>
       vscode.commands.registerCommand(id, run);
     return [
-      command('lanefold.open', () => vscode.commands.executeCommand(`${PANEL_VIEW_ID}.focus`)),
+      // The view in use (an editor tab, when Lanefold was last used in one), else the panel.
+      command('lanefold.open', () => this.toView()),
       command('lanefold.openInEditor', (state?: unknown) => this.editors.open(state)),
       command('lanefold.refresh', () => this.backend.sendCommand('refresh')),
       command('lanefold.undo', () => this.inView('undo')),
@@ -345,20 +346,36 @@ export class LanefoldApp implements vscode.Disposable {
   }
 
   /**
-   * Runs a webview command (Undo, Redo) in the view the person was using, or in the panel when no
-   * Lanefold view is on screen: once, so it shows its outcome.
+   * Runs a webview command (Undo, Redo) in the view the person was using, without moving focus
+   * there; with no Lanefold view on screen, in the one brought forward for it (see
+   * {@link toView}): once, so it shows its outcome.
    */
   private async inView(command: string): Promise<void> {
     if (this.backend.sendCommand(command)) return;
-    await this.openPanel();
-    this.backend.sendCommand(command, undefined, 'primary');
+    await this.toView(command);
   }
 
-  /** Opens the panel on `repo` (waiting for its webview if needed) and runs a webview command. */
+  /** Runs a webview command on `repo` in the Lanefold view in use (see {@link toView}). */
   private async runInView(repo: Repository, command: string, args: unknown): Promise<void> {
     this.registry.setActive(repo.id);
+    await this.toView(command, args);
+  }
+
+  /**
+   * Brings the Lanefold view in use forward, with keyboard focus, and runs `command` there (if
+   * any): a view on screen, the panel or an editor tab, so nothing moves while Lanefold is in
+   * sight; else the one used last, wherever it is hidden; else the panel, opened for it (waiting
+   * for its webview if needed).
+   */
+  private async toView(command?: string, args?: unknown): Promise<void> {
+    const view = this.backend.viewInUse();
+    if (view) {
+      this.backend.showView(view);
+      if (command) this.backend.sendCommand(command, args, view);
+      return;
+    }
     await this.openPanel();
-    this.backend.sendCommand(command, args, 'primary');
+    if (command) this.backend.sendCommand(command, args, 'primary');
   }
 
   /** Shows the panel and waits (a while) for its webview to be ready. */
@@ -464,6 +481,10 @@ export class LanefoldApp implements vscode.Disposable {
     return {
       repositories: () => this.registry.all.map((repo) => repo.root),
       readyWebviews: () => this.backend.readyConnections.length,
+      viewInUse: () => {
+        const view = this.backend.viewInUse();
+        return view && (this.backend.isPrimary(view) ? 'panel' : 'editor');
+      },
       captureTheme: async () => {
         const endpoint = this.backend.readyConnections.at(-1);
         if (!endpoint) throw new Error('No webview is connected');
@@ -483,6 +504,8 @@ export class LanefoldApp implements vscode.Disposable {
 export interface LanefoldTestingApi {
   repositories(): string[];
   readyWebviews(): number;
+  /** Where a command that needs a Lanefold view would go now (undefined: the panel, opened for it). */
+  viewInUse(): 'panel' | 'editor' | undefined;
   captureTheme(): Promise<ThemeSnapshot>;
   consoleHistory(): readonly ConsoleEntry[];
   blame(uri: string): { lines: number; summaries: string[] } | undefined;

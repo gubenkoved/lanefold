@@ -116,6 +116,38 @@ suite('Lanefold', () => {
     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
   });
 
+  test('commands go to the Lanefold view in use: an editor tab rather than the panel', async () => {
+    const { testing } = await api();
+    const lanefoldTab = () => {
+      const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+      return input instanceof vscode.TabInputWebview && input.viewType.endsWith('lanefold.editor');
+    };
+    // Only the editor tab is on screen.
+    await vscode.commands.executeCommand('workbench.action.closePanel');
+    await vscode.commands.executeCommand('lanefold.openInEditor');
+    await waitFor(() => testing!.viewInUse() === 'editor');
+    // Open, and a command that shows something, stay in it: the panel does not come up.
+    await vscode.commands.executeCommand('lanefold.open');
+    await vscode.commands.executeCommand('lanefold.showStatistics');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    assert.equal(testing!.viewInUse(), 'editor');
+    assert.ok(lanefoldTab(), 'the Lanefold tab is still in front');
+
+    // Behind another editor, it is the view used last (or none, if it never had focus here).
+    const repo = testing!.repositories().find((root) => root.endsWith('aurora'))!;
+    await vscode.window.showTextDocument(vscode.Uri.file(join(repo, 'README.md')), { preview: false });
+    await waitFor(() => !lanefoldTab());
+    if (testing!.viewInUse() === 'editor') {
+      await vscode.commands.executeCommand('lanefold.open');
+      await waitFor(lanefoldTab);
+    }
+
+    // Closed, the panel is where commands go again.
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    await vscode.commands.executeCommand('lanefold.open');
+    await waitFor(() => testing!.viewInUse() === 'panel');
+  });
+
   /**
    * With LANEFOLD_SCREENSHOTS=<dir>, saves what the (virtual) screen shows, `settleMs` after what
    * just changed (annotations, an editor) for it to render. Without it, does nothing.

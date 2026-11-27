@@ -32,6 +32,7 @@ export class PanelViewProvider implements vscode.WebviewViewProvider {
       bootstrap: { host: 'panel', restoredState: context.state },
       gravatar: readSettings().gravatar,
       primary: true,
+      reveal: () => view.show(false),
     });
   }
 }
