@@ -13,8 +13,10 @@ import {
   type RewriteSimulation,
   type RewriteStep,
 } from '../../shared/rewrite';
+import { displayRev } from '../../shared/oid';
 import { revisions } from '../git/args';
 import { INTERNAL_IDENTITY } from '../git/identity';
+import { resolveCommit } from '../git/queries';
 import type { Repository } from '../repo/repository';
 
 /** The most commits the history editor takes at once. */
@@ -82,6 +84,66 @@ export async function readRewriteRange(
     });
   }
   return { base, head: head.sha, branch: head.branch, commits, merges };
+}
+
+/** Beyond this many commits on the target's side, they are not compared patch by patch. */
+const MAX_COMPARED_COMMITS = 2000;
+
+/**
+ * The commits a rebase of HEAD onto `onto` replays: those after their merge base (every commit,
+ * when they share no history), with the ones `onto` already has marked. When HEAD already
+ * contains `onto` there is nothing to move: the range is an ordinary edit of the commits after
+ * it (no `onto`). Throws when `onto` names no commit.
+ */
+export async function readRebaseRange(
+  repo: Repository,
+  onto: string,
+  limit = MAX_REWRITE_COMMITS,
+): Promise<Range | undefined> {
+  const head = await repo.head();
+  if (!head.sha) return undefined;
+  const sha = await resolveCommit(repo, onto);
+  if (!sha) throw new Error(`${displayRev(onto)} is not a commit.`);
+  const merged = await repo.git(['merge-base', ...revisions(head.sha, sha)], {
+    readOnly: true,
+    background: true,
+    label: 'Where the branches part',
+    okExitCodes: [0, 1],
+  });
+  const base = merged.stdout.trim() || null;
+  const range = await readRewriteRange(repo, base, limit);
+  if (!range || base === sha) return range;
+  const target = { rev: onto, sha };
+  if (range.commits.length === 0) return { ...range, onto: target };
+  return { ...range, onto: target, alreadyThere: await alreadyThere(repo, sha, head.sha) };
+}
+
+/** The range of a history edit: a rebase onto `onto` when given, else the commits after `base`. */
+export function readRange(repo: Repository, base: string | null, onto?: string): Promise<Range | undefined> {
+  return onto ? readRebaseRange(repo, onto) : readRewriteRange(repo, base);
+}
+
+/** Commits of `head` whose changes `onto` already has, as another commit with the same patch. */
+async function alreadyThere(repo: Repository, onto: string, head: string): Promise<string[]> {
+  try {
+    const ahead = await repo.git(['rev-list', '--count', ...revisions(onto, `^${head}`)], {
+      readOnly: true,
+      background: true,
+      label: 'Commits to compare',
+    });
+    if ((Number(ahead.stdout.trim()) || 0) > MAX_COMPARED_COMMITS) return [];
+    const { stdout } = await repo.git(
+      ['rev-list', '--cherry-mark', '--right-only', '--no-merges', ...revisions(`${onto}...${head}`)],
+      { readOnly: true, background: true, label: 'Commits already there' },
+    );
+    return stdout
+      .split('\n')
+      .filter((line) => line.startsWith('='))
+      .map((line) => line.slice(1).trim());
+  } catch {
+    // Only a hint: without it every commit starts out picked.
+    return [];
+  }
 }
 
 async function internalCommit(repo: Repository, tree: string, parents: string[], message: string) {
@@ -303,8 +365,10 @@ export async function simulateRewrite(
     return commit;
   };
 
-  let current = await treeOfCommit(range.base ?? undefined);
-  if (range.base) cache.setCommit(current, range.base);
+  // A rebase replays onto its target; an edit in place, onto the commit it starts after.
+  const start = range.onto?.sha ?? range.base;
+  let current = await treeOfCommit(start ?? undefined);
+  if (start) cache.setCommit(current, start);
   const steps: RewriteStep[] = [];
   let blocked = false;
   for (const entry of order) {

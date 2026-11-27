@@ -2,10 +2,11 @@ import { create } from 'zustand';
 import type { OperationPlan } from '../../shared/operations';
 import {
   cleanMessage,
-  firstChange,
+  firstRewritten,
   foldManyInto,
   groupMessage,
   groupRewrite,
+  initialArrangement,
   normalizeRewrite,
   pickAll,
   rewriteProblem,
@@ -16,11 +17,12 @@ import {
   type RewriteRange,
   type RewriteSimulation,
 } from '../../shared/rewrite';
+import { displayRev } from '../../shared/oid';
 import { errorText } from '../bridge/errorText';
 import { toast } from '../components/Toast';
 import { noteRenames } from '../graph/renames';
-import { refreshOpState, report, useOperations } from './operations';
-import { hostRpc, useApp } from './store';
+import { refreshOpState, report, runOperation, useOperations } from './operations';
+import { hostRpc, showLogTab, useApp } from './store';
 
 /** One step of the editor's own undo history. */
 interface Arrangement {
@@ -87,11 +89,23 @@ export function messageOf(session: Pick<RewriteSession, 'range'>): (sha: string)
   return (sha) => messages.get(sha);
 }
 
-/** True when the arrangement changes something. */
+/** True when the arrangement changes something (a rebase always does: every commit moves). */
 export function isDirty(session: Arranged): boolean {
-  const original = session.range.commits.map((commit) => commit.sha);
   const entries = normalizeRewrite(session.entries, messageOf(session));
-  return firstChange(entries, original) < entries.length;
+  return firstRewritten(entries, session.range) < entries.length;
+}
+
+/** True when the arrangement is not the one the editor opened with. */
+export function isArranged(session: Arranged): boolean {
+  const initial = initialArrangement(session.range);
+  const entries = normalizeRewrite(session.entries, messageOf(session));
+  return (
+    entries.length !== initial.length ||
+    entries.some(
+      (entry, i) =>
+        entry.sha !== initial[i]!.sha || entry.action !== initial[i]!.action || entry.message !== undefined,
+    )
+  );
 }
 
 /**
@@ -129,6 +143,11 @@ export function useEditorShowing(): boolean {
 export interface StartOptions {
   /** The commit the edit starts after (`null`: from the root commit). */
   readonly base: string | null;
+  /**
+   * Rebase as well: the revision to replay the commits onto. The edit then covers the commits
+   * it lacks (`base` is not read).
+   */
+  readonly onto?: string;
   /** Arranges the initial plan (everything picked, oldest first) for a quick action. */
   readonly arrange?: (entries: RewriteEntry[], range: RewriteRange) => RewriteEntry[];
   /** Commits to select (and focus the first of). */
@@ -150,9 +169,30 @@ export async function startRewrite(options: StartOptions): Promise<void> {
   }
   let range: RewriteRange | undefined;
   try {
-    range = await hostRpc().call('rewrite.range', { repoId, base: options.base });
+    range = await hostRpc().call('rewrite.range', { repoId, base: options.base, onto: options.onto });
   } catch (error) {
     toast('Could not read the history', { kind: 'error', detail: errorText(error) });
+    return;
+  }
+  const onto = options.onto;
+  const branch = range?.branch ?? 'HEAD';
+  // Offered where the commits cannot be arranged: the rebase as git does it on its own.
+  const plain = onto
+    ? { label: 'Rebase as they are', run: () => void runOperation({ kind: 'rebase', onto }) }
+    : undefined;
+  if (range && onto && !range.onto) {
+    // Nothing to move: what is left is an ordinary edit of the commits after the target.
+    if (range.commits.length === 0 && !range.tooMany) {
+      toast(`${branch} is at ${displayRev(onto)} already`, { detail: 'There is nothing to rebase.' });
+      return;
+    }
+    toast(`${branch} already contains ${displayRev(onto)}`, {
+      detail: 'Nothing moves: its commits after it are ready to edit.',
+    });
+  }
+  if (range?.onto && range.commits.length === 0 && !range.tooMany) {
+    // No commits of its own: the branch only moves forward, with nothing to arrange.
+    void runOperation({ kind: 'rebase', onto: range.onto.rev });
     return;
   }
   if (!range || (range.commits.length === 0 && !range.tooMany)) {
@@ -162,19 +202,27 @@ export async function startRewrite(options: StartOptions): Promise<void> {
   if (range.tooMany) {
     toast(`That is ${range.tooMany.toLocaleString()} commits`, {
       kind: 'error',
-      detail: 'Start from a more recent commit.',
+      detail: range.onto ? 'Too many to arrange here.' : 'Start from a more recent commit.',
+      action: range.onto ? plain : undefined,
     });
     return;
   }
   if (range.merges > 0) {
-    toast('This part of the history has merge commits', {
-      kind: 'error',
-      detail: 'Editing it here would flatten the merges. Start after the most recent merge.',
-    });
+    toast(
+      range.onto ? `${branch} has merge commits to replay` : 'This part of the history has merge commits',
+      {
+        kind: 'error',
+        detail: range.onto
+          ? 'Arranging them here would flatten the merges.'
+          : 'Editing it here would flatten the merges. Start after the most recent merge.',
+        action: range.onto ? plain : undefined,
+      },
+    );
     return;
   }
   const originals = new Map(range.commits.map((commit) => [commit.sha, commit.message]));
-  const entries = (options.arrange?.(pickAll(range.commits), range) ?? pickAll(range.commits)).map((entry) =>
+  const initial = initialArrangement(range);
+  const entries = (options.arrange?.(initial, range) ?? initial).map((entry) =>
     // A reword starts from the original message, ready to change.
     entry.action === 'reword' && entry.message === undefined
       ? { ...entry, message: cleanMessage(originals.get(entry.sha) ?? '') }
@@ -279,9 +327,16 @@ export function redoArrangement(): void {
   schedule(next);
 }
 
-/** Back to the original history (everything picked, in order). */
+/** Back to how the editor opened: everything picked, in order (a rebase leaves out what is there already). */
 export function resetArrangement(): void {
-  arrange((_, session) => pickAll(session.range.commits), { updateRefs: false });
+  arrange((_, session) => initialArrangement(session.range), { updateRefs: false });
+}
+
+/** Opens the editor to rebase the current branch onto `onto`, its commits ready to arrange. */
+export function rebaseInteractively(onto: string): Promise<void> {
+  // Asked for from anywhere (a review sheet, the command palette): the editor shows in a log tab.
+  showLogTab();
+  return startRewrite({ base: null, onto });
 }
 
 /** Sets the action of commits; rewording opens the message editor prefilled. */
@@ -362,7 +417,8 @@ export function foldCommits(shas: readonly string[], target: string, action: 'sq
  */
 export async function includeOlder(base: string | null): Promise<void> {
   const session = current();
-  if (!session || session.applying) return;
+  // A rebase covers what its target lacks: nothing older belongs to it.
+  if (!session || session.applying || session.range.onto) return;
   let range: RewriteRange | undefined;
   try {
     range = await hostRpc().call('rewrite.range', { repoId: session.repoId, base });
@@ -505,6 +561,7 @@ async function plan(id: number): Promise<void> {
       operation: {
         kind: 'rewrite',
         base: session.range.base,
+        onto: session.range.onto?.rev,
         entries: session.entries,
         updateRefs: session.updateRefs,
       },
@@ -529,7 +586,12 @@ async function simulate(id: number): Promise<void> {
   try {
     const simulation = await hostRpc().call(
       'rewrite.simulate',
-      { repoId: session.repoId, base: session.range.base, entries: session.entries },
+      {
+        repoId: session.repoId,
+        base: session.range.base,
+        onto: session.range.onto?.rev,
+        entries: session.entries,
+      },
       { signal: controller.signal },
     );
     if (!controller.signal.aborted) patch({ simulation, simulating: false }, id);

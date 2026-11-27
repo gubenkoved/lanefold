@@ -5,9 +5,11 @@ import {
   cleanMessage,
   defaultGroupMessage,
   firstChange,
+  firstRewritten,
   foldInto,
   groupMessage,
   groupRewrite,
+  initialArrangement,
   layoutTodo,
   normalizeRewrite,
   pickAll,
@@ -153,6 +155,24 @@ describe('rewrite model', () => {
     expect(firstChange(squashSelection(picks(), new Set(['b', 'e'])), shas)).toBe(1);
     // Dropping only the newest commit changes nothing before it.
     expect(firstChange([...picks().slice(0, 4), { sha: 'e', action: 'drop' }], shas)).toBe(4);
+  });
+
+  it('rewrites every commit of a rebase, whatever the arrangement', () => {
+    const commits = shas.map((sha) => ({ sha }));
+    // Edited in place, commits before the first change stay as they are.
+    expect(firstRewritten(picks(), { commits })).toBe(5);
+    // Replayed onto another commit, even the commits as they are all change.
+    expect(firstRewritten(picks(), { commits, onto: { rev: 'main', sha: 'f' } })).toBe(0);
+  });
+
+  it('starts a rebase without the commits its target already has', () => {
+    const commits = shas.map((sha) => ({ sha }));
+    expect(initialArrangement({ commits })).toEqual(picks());
+    expect(
+      initialArrangement({ commits, alreadyThere: ['b', 'd'] }).map(
+        (entry) => `${entry.action} ${entry.sha}`,
+      ),
+    ).toEqual(['pick a', 'drop b', 'pick c', 'drop d', 'pick e']);
   });
 
   it('squashes a scattered selection into its oldest commit', () => {

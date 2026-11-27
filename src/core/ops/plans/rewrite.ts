@@ -3,9 +3,10 @@
  * and amending a commit with the staged changes.
  */
 
+import { isObjectId } from '../../../shared/oid';
 import type { Operation } from '../../../shared/operations';
 import {
-  firstChange,
+  firstRewritten,
   groupMessage,
   groupRewrite,
   layoutTodo,
@@ -14,9 +15,10 @@ import {
   validateRewrite,
 } from '../../../shared/rewrite';
 import { revisions } from '../../git/args';
-import { MAX_REWRITE_COMMITS, readRewriteRange, simulateAmendInto } from '../../rebase/rewrite';
+import { MAX_REWRITE_COMMITS, readRange, readRewriteRange, simulateAmendInto } from '../../rebase/rewrite';
 import type { PlanBuilder, PlanContext } from '../planner';
 import {
+  commitName,
   commitTitle,
   count,
   describeDirty,
@@ -26,6 +28,7 @@ import {
   parentsOf,
   plural,
   resolveCommit,
+  revLabel,
   short,
   warnIfPublished,
 } from './common';
@@ -169,10 +172,22 @@ export async function planRewrite(
   b: PlanBuilder,
 ) {
   const name = ctx.head.branch ?? 'HEAD';
-  const title = `Edit history of ${name}`;
+  // A rebase: the arranged commits are replayed onto another commit.
+  const onto = op.onto === undefined ? undefined : await resolveCommit(ctx.repo, op.onto);
+  const label =
+    op.onto === undefined
+      ? ''
+      : isObjectId(op.onto) && onto
+        ? await commitName(ctx, onto, ctx.head.branch)
+        : revLabel(op.onto);
+  const title = op.onto === undefined ? `Edit history of ${name}` : `Rebase ${name} onto ${label}`;
   const head = ctx.head.sha;
   if (!head) {
     b.block('There is no history to edit yet.');
+    return title;
+  }
+  if (op.onto !== undefined && !onto) {
+    b.block(`${label} is not a commit.`);
     return title;
   }
   if (!ctx.canRewrite) {
@@ -184,7 +199,8 @@ export async function planRewrite(
     return title;
   }
   let base: string | null = null;
-  if (op.base !== null) {
+  // A rebase starts where the branch and its target part: the range says where.
+  if (op.onto === undefined && op.base !== null) {
     const resolved = await resolveCommit(ctx.repo, op.base);
     if (!resolved) {
       b.block(`${op.base} is not a commit.`);
@@ -196,20 +212,34 @@ export async function planRewrite(
     }
     base = resolved;
   }
-  const range = await readRewriteRange(ctx.repo, base);
+  const range = await readRange(ctx.repo, base, op.onto);
   if (!range) {
     b.block('There is no history to edit yet.');
     return title;
   }
+  const target = range.onto;
+  if (op.onto !== undefined) {
+    if (!target) {
+      b.block(`${name} already contains ${label}: there is nothing to rebase.`);
+      return title;
+    }
+    base = range.base;
+    b.pinned.push({ rev: op.onto, sha: target.sha });
+    b.action = 'Rebase';
+  }
   if (range.tooMany) {
     b.block(
-      `That is ${range.tooMany.toLocaleString()} commits; start from a more recent commit (at most ${MAX_REWRITE_COMMITS.toLocaleString()}).`,
+      target
+        ? `That is ${range.tooMany.toLocaleString()} commits to arrange (at most ${MAX_REWRITE_COMMITS.toLocaleString()}). Rebase without arranging them instead.`
+        : `That is ${range.tooMany.toLocaleString()} commits; start from a more recent commit (at most ${MAX_REWRITE_COMMITS.toLocaleString()}).`,
     );
     return title;
   }
   if (range.merges > 0) {
     b.block(
-      `The commits after ${base ? short(base) : 'the root'} include ${plural(range.merges, 'merge commit')}; editing them here would flatten the merges. Start after the last merge.`,
+      target
+        ? `The commits of ${name} that ${label} lacks include ${plural(range.merges, 'merge commit')}; arranging them would flatten the merges. Rebase without arranging them instead.`
+        : `The commits after ${base ? short(base) : 'the root'} include ${plural(range.merges, 'merge commit')}; editing them here would flatten the merges. Start after the last merge.`,
     );
     return title;
   }
@@ -225,7 +255,8 @@ export async function planRewrite(
   const messages = new Map(range.commits.map((commit) => [commit.sha, commit.message]));
   const messageOf = (sha: string) => messages.get(sha);
   const entries = normalizeRewrite(op.entries, messageOf);
-  const from = firstChange(entries, original);
+  // Replayed onto another commit, every commit changes: as they are is a plan too (a plain rebase).
+  const from = firstRewritten(entries, range);
   if (from === entries.length) b.block('Nothing changes yet: reorder commits or choose an action.');
   const groups = groupRewrite(entries);
   const keep = from > 0 ? original[from - 1]! : base;
@@ -275,15 +306,33 @@ export async function planRewrite(
   } else {
     args.push('--no-autostash');
   }
+  if (target) {
+    args.push('--reapply-cherry-picks', '--onto', op.onto!);
+    flags.push(
+      [
+        '--reapply-cherry-picks',
+        'take the commits exactly as arranged: git leaves none out on its own for being there already',
+      ],
+      [
+        '--onto',
+        `replay onto ${label}${base ? ` the commits after ${short(base)}, where ${name} left its history` : ''}`,
+      ],
+    );
+  }
   if (base) args.push('--end-of-options', base);
   else {
     args.push('--root');
-    flags.push(['--root', 'edit from the very first commit']);
+    flags.push(['--root', target ? 'every commit of the branch' : 'edit from the very first commit']);
   }
   const splits = groups.filter((group) => group.head.action === 'split').map((group) => group.head.sha);
+  const outcome = `${plural(original.length, 'commit')} become ${plural(groups.length, 'commit')}${splits.length > 0 ? ', plus the parts split off' : ''}`;
   b.command(
     ['rebase', ...args.filter((arg) => arg !== '--end-of-options')],
-    `Rewrite ${name} from ${short(original[from]) || 'its first change'} on, following the todo: ${plural(original.length, 'commit')} become ${plural(groups.length, 'commit')}${splits.length > 0 ? ', plus the parts split off' : ''}.`,
+    target
+      ? groups.length === 0
+        ? `Move ${name} to ${label}: none of its ${plural(original.length, 'commit')} is kept.`
+        : `Replay ${name} on top of ${label}, following the todo: ${outcome}.`
+      : `Rewrite ${name} from ${short(original[from]) || 'its first change'} on, following the todo: ${outcome}.`,
     flags,
   );
 
@@ -295,8 +344,10 @@ export async function planRewrite(
     b.notice(
       'info',
       results === 0
-        ? `${name} ${keep ? `goes back to ${short(keep)}` : 'is left with no commits'}: ${rewritten === 1 ? 'the commit after it leaves' : `the ${rewritten} commits after it leave`} the branch. Undo puts ${name} back.`
-        : `${plural(rewritten, 'commit')} ${rewritten === 1 ? 'becomes' : 'become'} ${plural(results, 'new commit')}${splits.length > 0 ? ', plus the parts split off' : ''}; authors and author dates are kept. Undo puts ${name} back.`,
+        ? target
+          ? `${name} moves to ${label}: ${rewritten === 1 ? 'its commit leaves' : `its ${rewritten} commits leave`} the branch. Undo puts ${name} back.`
+          : `${name} ${keep ? `goes back to ${short(keep)}` : 'is left with no commits'}: ${rewritten === 1 ? 'the commit after it leaves' : `the ${rewritten} commits after it leave`} the branch. Undo puts ${name} back.`
+        : `${plural(rewritten, 'commit')} ${rewritten === 1 ? 'becomes' : 'become'} ${plural(results, 'new commit')}${target ? ` on top of ${label}` : ''}${splits.length > 0 ? ', plus the parts split off' : ''}; authors and author dates are kept. Undo puts ${name} back.`,
     );
     const notPushed = await count(ctx.repo, ['--not', '--remotes', '--not', ...revisions(...rewrittenRevs)]);
     const published = rewritten - notPushed;
@@ -365,10 +416,14 @@ export async function planRewrite(
   b.changes.push({
     ref: ctx.head.branch ? `refs/heads/${ctx.head.branch}` : 'HEAD',
     from: head,
-    toNew:
-      splits.length > 0
-        ? `${groups.length} or more rewritten commits`
-        : plural(groups.length, 'rewritten commit'),
+    ...(target && groups.length === 0
+      ? { to: target.sha }
+      : {
+          toNew:
+            splits.length > 0
+              ? `${groups.length} or more ${target ? 'rebased' : 'rewritten'} commits`
+              : plural(groups.length, target ? 'rebased commit' : 'rewritten commit'),
+        }),
   });
   for (const ref of updateRefs ? otherBranches : []) {
     b.changes.push({ ref: ref.name, from: ref.target, toNew: 'its rewritten commit' });

@@ -272,7 +272,11 @@ export async function writtenVersions(
     case 'rebase':
       return [operation.onto, ...(await commitsSince(repo, operation.onto))];
     case 'rewrite':
-      return [...(operation.base ? [operation.base] : []), ...operation.entries.map((entry) => entry.sha)];
+      return [
+        ...(operation.onto ? [operation.onto] : []),
+        ...(operation.base ? [operation.base] : []),
+        ...operation.entries.map((entry) => entry.sha),
+      ];
     case 'amendInto':
       return [`${operation.commit}^`, ...(await commitsSince(repo, `${operation.commit}^`))];
     case 'stashApply': {

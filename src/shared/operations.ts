@@ -94,6 +94,11 @@ export type Operation =
       readonly kind: 'rewrite';
       /** The commit the edited history starts after; `null` edits from the root commit. */
       readonly base: string | null;
+      /**
+       * Rebase as well: replay the arranged commits onto this revision. The edited history then
+       * starts where the branch and this revision part (their merge base), whatever `base` says.
+       */
+      readonly onto?: string;
       readonly entries: readonly RewriteEntry[];
       /** Also move other local branches that point into the edited history (`--update-refs`). */
       readonly updateRefs?: boolean;

@@ -6,9 +6,15 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { connectHost } from './bridge/host';
 import { HostContext } from './hostContext';
-import { connectOperations, redo, undo } from './state/operations';
-import { editorShowing, redoArrangement, undoArrangement, useRewrite } from './state/rewrite';
-import { connectStore, useApp } from './state/store';
+import { connectOperations, redo, undo, whenActive } from './state/operations';
+import {
+  editorShowing,
+  rebaseInteractively,
+  redoArrangement,
+  undoArrangement,
+  useRewrite,
+} from './state/rewrite';
+import { connectStore, tabsLoaded, useApp } from './state/store';
 
 const host = connectHost();
 host.rpc.emit('ui.ready', {});
@@ -17,7 +23,16 @@ connectOperations();
 
 // Undo and Redo from VS Code (the command palette, Ctrl+Z in the graph): while the history
 // editor shows, they step through its arrangement, as its own keys do; git's Undo waits.
-host.rpc.on('command.run', ({ command }) => {
+host.rpc.on('command.run', ({ command, args }) => {
+  // Rebase Interactively onto…, its target picked in VS Code: the history editor opens on it.
+  if (command === 'startRebaseOnto') {
+    const { repoId, onto } = (args ?? {}) as { repoId?: unknown; onto?: unknown };
+    if (typeof repoId !== 'string' || typeof onto !== 'string') return;
+    void whenActive(repoId)
+      .then((active) => (active ? tabsLoaded().then(() => true) : false))
+      .then((ready) => ready && void rebaseInteractively(onto));
+    return;
+  }
   if (command !== 'undo' && command !== 'redo') return;
   if (editorShowing()) (command === 'undo' ? undoArrangement : redoArrangement)();
   else void (command === 'undo' ? undo() : redo());

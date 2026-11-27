@@ -45,6 +45,9 @@ shows the git commands it will use, and every change it makes to the repository 
 - An interactive rebase editor in the graph: reorder, squash, fix up, reword, drop, stop to edit
   and split commits, with the keyboard or by drag and drop.
 - A dry run of each arrangement that predicts conflicts and empty commits before anything runs.
+- Rebase onto another branch in the same editor: the commits that branch lacks are listed to
+  drop, squash or reorder before they are replayed. Those it already has as other commits start
+  out dropped, which helps after an upstream was rewritten.
 - Amend any recent commit with the staged changes by dragging them onto it.
 - Split a commit by committing its changes in parts.
 
@@ -73,8 +76,9 @@ shows the git commands it will use, and every change it makes to the repository 
   behind it is. While a merge, rebase, cherry-pick, revert, patch or bisect is stopped, it says
   so, with the number of conflicts.
 - Switch Branch, Create Branch, Delete Branch, Delete Branches Whose Upstream Is Gone, Fetch,
-  Pull, Push, Stash Changes and Compare Branches from the Command Palette, reviewed and undoable
-  like Lanefold's own buttons.
+  Pull, Push, Rebase Interactively onto, Stash Changes and Compare Branches from the Command
+  Palette, reviewed and undoable like Lanefold's own buttons. The rebase picker lists recently
+  used branches first too.
 
 ![The Switch Branch picker over the Lanefold graph, with recent branches first, and the branch in the status bar](https://gist.githubusercontent.com/gubenkoved/66fff765499dc9a41fddfc132bbf5861/raw/switch-branch.png)
 

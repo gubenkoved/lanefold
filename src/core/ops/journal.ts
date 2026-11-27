@@ -34,6 +34,7 @@ export interface PendingEntry {
   readonly snapshot?: string;
   /** History edits: what is needed to tell which commit each original commit became. */
   readonly rewrite?: {
+    /** The commit the resulting commits sit on: what the edit started after, or was rebased onto. */
     readonly base: string | null;
     /** Original commits per resulting commit (head first), oldest group first. */
     readonly groups: readonly (readonly string[])[];
@@ -163,7 +164,7 @@ export function rewriteInfo(record: PlanRecord): NonNullable<PendingEntry['rewri
   for (const commit of rewrite.range.commits)
     authors[commit.sha] = { name: commit.authorName, time: commit.authorTime };
   return {
-    base: rewrite.range.base,
+    base: rewrite.range.onto?.sha ?? rewrite.range.base,
     groups: groupRewrite(rewrite.entries).map((group) => [
       group.head.sha,
       ...group.members.map((m) => m.sha),

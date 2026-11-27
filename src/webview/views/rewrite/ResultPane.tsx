@@ -5,6 +5,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
+import { displayRev } from '../../../shared/oid';
 import type { RewriteStep } from '../../../shared/rewrite';
 import { formatCommand } from '../../../shared/shell';
 import { CommandLine } from '../../components/CommandLine';
@@ -96,9 +97,11 @@ export function ResultPane({
           </AnimatePresence>
           {results.length === 0 ? (
             <div className={styles.empty}>
-              {session.range.base
-                ? `Every commit is dropped: ${session.range.branch ?? 'HEAD'} goes back to ${shortSha(session.range.base)}.`
-                : 'Every commit is dropped.'}
+              {session.range.onto
+                ? `Every commit is dropped: ${session.range.branch ?? 'HEAD'} moves to ${displayRev(session.range.onto.rev)}.`
+                : session.range.base
+                  ? `Every commit is dropped: ${session.range.branch ?? 'HEAD'} goes back to ${shortSha(session.range.base)}.`
+                  : 'Every commit is dropped.'}
             </div>
           ) : null}
         </div>

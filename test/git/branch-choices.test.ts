@@ -3,6 +3,7 @@ import {
   branchChoices,
   hasUntrackedFiles,
   headStatus,
+  rebaseTargets,
   recentBranches,
 } from '../../src/core/repo/branchChoices';
 import { Repository } from '../../src/core/repo/repository';
@@ -82,6 +83,25 @@ describe('branch choices (real git)', () => {
 
     expect(await recentBranches(repo)).toEqual(['a', 'b']);
     expect(await recentBranches(repo, 1)).toEqual(['a']);
+  });
+
+  it('offers rebase targets with recently used branches first, without the one checked out', async () => {
+    await local.at('2024-02-01').commit('mine');
+    await local.branch('old', 'HEAD~1');
+    await local.branch('a');
+    await local.branch('b');
+    await local.checkout('b');
+    await local.checkout('a');
+    await local.checkout('main');
+
+    const targets = rebaseTargets(await branchChoices(repo), await recentBranches(repo));
+    expect(targets.recent.map((choice) => choice.name)).toEqual(['a', 'b']);
+    expect(targets.branches.map((choice) => choice.name)).toEqual(['old']);
+    // Every remote branch, the checked-out branch's own upstream included.
+    expect(targets.remotes.map((choice) => choice.name).sort()).toEqual([
+      'origin/main',
+      'origin/remote-only',
+    ]);
   });
 
   it('has no recent branches in a repository without commits', async () => {

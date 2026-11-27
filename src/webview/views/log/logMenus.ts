@@ -9,6 +9,7 @@ import type { DragItem, GraphView } from '../../graph/GraphView';
 import type { LogModel } from '../../graph/logModel';
 import { changeIndex } from '../../state/indexChanges';
 import { runOperation, useOperations } from '../../state/operations';
+import { rebaseInteractively } from '../../state/rewrite';
 import { fetchCommitDetails } from '../../state/queries';
 import { hostRpc, showStashes, useApp } from '../../state/store';
 import { compareTitle, type CompareMode } from '../../state/tabs';
@@ -532,6 +533,8 @@ export function showRowMenu(context: MenuContext, row: number, x: number, y: num
           reason: unborn ?? already,
           onSelect: () => void runOperation({ kind: 'rebase', onto: sha }),
         },
+        // Within the branch's own history, "Edit history" arranges the commits after it.
+        interactiveRebaseEntry(sha, shortSha(sha), unborn ?? already),
       ];
   const operations: MenuEntry[] = [
     { kind: 'separator' },
@@ -794,7 +797,25 @@ function intoHeadEntries(model: LogModel, ref: RefInfo): MenuEntry[] {
       reason,
       onSelect: () => void runOperation({ kind: 'rebase', onto: ref.short }),
     },
+    // Possible where a plain rebase has nothing to do: the commits after the branch are edited.
+    interactiveRebaseEntry(ref.short, ref.short, unbornReason(model)),
   ];
+}
+
+/**
+ * The rebase with its commits arranged first: the history editor on the commits `onto` lacks,
+ * to drop, squash or reorder before they are replayed.
+ */
+function interactiveRebaseEntry(onto: string, label: string, reason?: string): MenuEntry {
+  return {
+    id: 'rebase-interactive',
+    label: 'Rebase interactively…',
+    icon: 'list-ordered',
+    hint: `git rebase -i --onto ${label}`,
+    disabled: !!reason,
+    reason,
+    onSelect: () => void rebaseInteractively(onto),
+  };
 }
 
 export function showRefMenu(
@@ -1155,6 +1176,7 @@ export function showDropMenu(
         reason: has,
         onSelect: () => void runOperation({ kind: 'rebase', onto: target }),
       },
+      interactiveRebaseEntry(target, target === targetSha ? shortSha(targetSha) : target, has),
       {
         id: 'merge',
         label: `Merge ${targetLabel} into ${ref.short}`,
@@ -1194,6 +1216,7 @@ export function showDropMenu(
           reason: has,
           onSelect: () => void runOperation({ kind: 'rebase', onto: ref.short }),
         },
+        interactiveRebaseEntry(ref.short, ref.short),
       );
     }
     if (ref.kind === 'branch') {

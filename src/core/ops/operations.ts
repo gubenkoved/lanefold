@@ -21,7 +21,7 @@ import { GitError } from '../git/errors';
 import { resolveCommit } from '../git/queries';
 import {
   mapRewritten,
-  readRewriteRange,
+  readRange,
   runPlannedRebase,
   SimulationCache,
   simulateRewrite,
@@ -260,9 +260,12 @@ export class RepoOperations {
     return record.plan;
   }
 
-  /** The commits a history edit after `base` would cover (for the editor). */
-  rewriteRange(base: string | null): Promise<RewriteRange | undefined> {
-    return readRewriteRange(this.repo, base);
+  /**
+   * The commits a history edit after `base` would cover (for the editor); with `onto`, those a
+   * rebase onto it replays.
+   */
+  rewriteRange(base: string | null, onto?: string): Promise<RewriteRange | undefined> {
+    return readRange(this.repo, base, onto);
   }
 
   /** Dry-runs a history edit: which step would conflict or become empty. */
@@ -270,8 +273,9 @@ export class RepoOperations {
     base: string | null,
     entries: readonly RewriteEntry[],
     signal?: AbortSignal,
+    onto?: string,
   ): Promise<RewriteSimulation> {
-    const range = await readRewriteRange(this.repo, base);
+    const range = await readRange(this.repo, base, onto);
     if (!range || range.tooMany || range.merges > 0) return { supported: false, steps: [] };
     return simulateRewrite(this.repo, range, entries, this.simulations, signal);
   }

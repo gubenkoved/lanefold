@@ -42,11 +42,25 @@ export interface RewriteCommit {
   readonly message: string;
 }
 
+/** The commit a history edit replays its commits onto, when that is not where they are now. */
+export interface RewriteOnto {
+  /** As it was asked for: a branch, a tag, a commit. */
+  readonly rev: string;
+  readonly sha: string;
+}
+
 /** The commits after `base` up to HEAD, oldest first. */
 export interface RewriteRange {
   readonly base: string | null;
   readonly head: string;
   readonly branch?: string;
+  /**
+   * A rebase: the commits are replayed onto this commit instead of `base` (which is then where
+   * the branch left its history, the merge base). Every commit is rewritten.
+   */
+  readonly onto?: RewriteOnto;
+  /** Rebasing: commits whose changes `onto` already has (same patch), as git's own rebase leaves out. */
+  readonly alreadyThere?: readonly string[];
   readonly commits: readonly RewriteCommit[];
   /** Merge commits in the range (history with merges cannot be edited this way). */
   readonly merges: number;
@@ -344,6 +358,36 @@ export function groupTip(group: RewriteGroup): string {
 /** The original arrangement: every commit picked, in order. */
 export function pickAll(commits: readonly { readonly sha: string }[]): RewriteEntry[] {
   return commits.map((commit) => ({ sha: commit.sha, action: 'pick' }));
+}
+
+/**
+ * How an edit starts out: every commit picked, except, in a rebase, those the target already
+ * has, which are dropped (git's own rebase leaves them out without saying).
+ */
+export function initialArrangement(range: {
+  readonly commits: readonly { readonly sha: string }[];
+  readonly alreadyThere?: readonly string[];
+}): RewriteEntry[] {
+  const there = new Set(range.alreadyThere);
+  return range.commits.map((commit) => ({
+    sha: commit.sha,
+    action: there.has(commit.sha) ? 'drop' : 'pick',
+  }));
+}
+
+/**
+ * {@link firstChange} for a range: replayed onto another commit, every commit changes, whatever
+ * the arrangement.
+ */
+export function firstRewritten(
+  entries: readonly RewriteEntry[],
+  range: { readonly commits: readonly { readonly sha: string }[]; readonly onto?: RewriteOnto },
+): number {
+  if (range.onto) return 0;
+  return firstChange(
+    entries,
+    range.commits.map((commit) => commit.sha),
+  );
 }
 
 /**

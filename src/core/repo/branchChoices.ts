@@ -78,6 +78,31 @@ export async function recentBranches(repo: Repository, limit = 6): Promise<strin
   return recent.filter((name) => name !== branch).slice(0, limit);
 }
 
+/** Branches to rebase the checked-out one onto, in the order a picker lists them. */
+export interface RebaseTargets {
+  /** Local branches checked out lately, the latest first. */
+  readonly recent: readonly BranchChoice[];
+  /** The other local branches, most recently committed first. */
+  readonly branches: readonly BranchChoice[];
+  /** Every remote branch (a branch is as often rebased onto `origin/main` as onto `main`). */
+  readonly remotes: readonly BranchChoice[];
+}
+
+/**
+ * Orders `choices` (see {@link branchChoices}) as targets of a rebase: the checked-out branch is
+ * left out, and the branches named in `recent` (see {@link recentBranches}) come first.
+ */
+export function rebaseTargets(choices: readonly BranchChoice[], recent: readonly string[]): RebaseTargets {
+  const local = choices.filter((choice) => choice.kind === 'branch' && !choice.current);
+  return {
+    recent: recent
+      .map((name) => local.find((choice) => choice.name === name))
+      .filter((choice): choice is BranchChoice => !!choice),
+    branches: local.filter((choice) => !recent.includes(choice.name)),
+    remotes: choices.filter((choice) => choice.kind === 'remote'),
+  };
+}
+
 /** The checked-out branch and how it stands against its upstream (as of the last fetch). */
 export interface HeadStatus {
   readonly branch?: string;

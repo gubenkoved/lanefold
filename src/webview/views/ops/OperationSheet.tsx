@@ -15,6 +15,7 @@ import { Segmented } from '../../components/Segmented';
 import { closeSheet, confirmSheet, editSheet, runOperation, useOperations } from '../../state/operations';
 import { copyText } from '../../state/queries';
 import { addRemote } from '../../state/remotes';
+import { rebaseInteractively } from '../../state/rewrite';
 import { folderFromUrl, openLinkedRepository } from '../log/submodules';
 import styles from './OperationSheet.module.css';
 
@@ -984,6 +985,22 @@ export function OperationSheet() {
               ) : null}
               {/* What it would change is not what happens while it cannot run. */}
               {plan && !blocked ? <Effects plan={plan} /> : null}
+              {/* A rebase replays the commits as they are; arranged first, some can be left out. */}
+              {plan && !blocked && sheet.operation.kind === 'rebase' && !sheet.running ? (
+                <div className={styles.remedy}>
+                  <button
+                    type="button"
+                    title="Open the commits in the history editor: drop, squash or reorder them, then rebase"
+                    onClick={() => {
+                      const { onto } = sheet.operation as Extract<Operation, { kind: 'rebase' }>;
+                      closeSheet();
+                      void rebaseInteractively(onto);
+                    }}
+                  >
+                    <Icon name="list-ordered" /> Arrange commits first…
+                  </button>
+                </div>
+              ) : null}
               {plan ? <Commands plan={plan} dimmed={blocked} /> : null}
               {sheet.error ? <p className={styles.error}>{sheet.error}</p> : null}
               <div className={styles.live} aria-live="polite">

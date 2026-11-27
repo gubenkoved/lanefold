@@ -7,6 +7,7 @@ import { motion } from 'motion/react';
 import { memo, useLayoutEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { RefInfo } from '../../../shared/models';
+import { displayRev } from '../../../shared/oid';
 import type { RewriteEntry, RewriteStep } from '../../../shared/rewrite';
 import { Icon } from '../../components/Icon';
 import { relativeTime, shortSha } from '../../graph/format';
@@ -44,6 +45,8 @@ interface PlanRowProps {
   readonly reworded: boolean;
   /** The subject of the commit it folds into (squash, fixup). */
   readonly intoSubject?: string;
+  /** Rebasing: the target, when it already has this commit's changes as another commit. */
+  readonly alreadyIn?: string;
   readonly dragged: boolean;
   readonly dropTarget: boolean;
   /** Glides to a new place (not in long lists: measuring every row would slow each change). */
@@ -73,6 +76,7 @@ function samePlanRow(a: PlanRowProps, b: PlanRowProps): boolean {
     a.subject === b.subject &&
     a.reworded === b.reworded &&
     a.intoSubject === b.intoSubject &&
+    a.alreadyIn === b.alreadyIn &&
     a.dragged === b.dragged &&
     a.dropTarget === b.dropTarget &&
     a.animate === b.animate &&
@@ -93,6 +97,7 @@ export const PlanRowItem = memo(function PlanRowItem({
   subject,
   reworded,
   intoSubject,
+  alreadyIn,
   dragged,
   dropTarget,
   animate,
@@ -103,6 +108,7 @@ export const PlanRowItem = memo(function PlanRowItem({
   const label = [
     `${ACTIONS[entry.action].label}: ${subject}${reworded ? ` (was “${commit.subject}”)` : ''}`,
     intoSubject !== undefined ? `folds into “${intoSubject}”` : '',
+    alreadyIn !== undefined ? `already in ${alreadyIn}` : '',
     `${commit.authorName}, ${relativeTime(commit.authorTime)}`,
     problem ? `can’t apply: ${problem}` : '',
     step?.status === 'conflict' ? 'conflict expected' : '',
@@ -162,6 +168,15 @@ export const PlanRowItem = memo(function PlanRowItem({
           {reworded ? <Icon name="edit" className={styles.reworded} /> : null}
           {subject}
         </span>
+        {alreadyIn !== undefined ? (
+          <span
+            className={styles.there}
+            title={`${alreadyIn} has these changes already, as another commit. Git’s own rebase leaves such a commit out; picked, it is replayed as an empty commit.`}
+          >
+            <Icon name="pass" />
+            already in {alreadyIn}
+          </span>
+        ) : null}
         {refs.length > 0 ? <Pills refs={refs} color={color} /> : null}
       </span>
       <span className={styles.author} title={`${commit.authorName} <${commit.authorEmail}>`}>
@@ -407,11 +422,14 @@ export function BaseRow({
   /** Widens the edit to start after `base` instead. */
   onInclude: (base: string | null) => void;
 }) {
-  const base = session.range.base;
+  const onto = session.range.onto;
+  // A rebase sits on its target; an edit in place, on the commit it starts after.
+  const base = onto?.sha ?? session.range.base;
   const meta = base ? (model?.source ?? model)?.metaOf(base) : undefined;
   const subject = meta?.subject;
   const merge = (meta?.parents.length ?? 0) > 1;
-  const older = model && !session.applying ? olderBase(model, base, OLDER_STEP) : undefined;
+  // Nothing older belongs to a rebase: it covers what its target lacks.
+  const older = model && !session.applying && !onto ? olderBase(model, base, OLDER_STEP) : undefined;
   return (
     <div className={styles.base}>
       <svg className={styles.graph} width={BRACKET_X + 9} height={ROW_H} aria-hidden="true">
@@ -427,7 +445,13 @@ export function BaseRow({
         <circle cx={LANE_X} cy={ROW_H / 2} r={4} fill="var(--lf-bg)" stroke={color} strokeWidth={1.5} />
       </svg>
       <span className={styles.baseText}>
-        {base ? (
+        {onto ? (
+          <>
+            Replayed onto <span className={styles.baseSubject}>{displayRev(onto.rev)}</span>{' '}
+            <code>{shortSha(onto.sha)}</code>{' '}
+            {subject ? <span className={styles.baseSubject}>{subject}</span> : null}
+          </>
+        ) : base ? (
           <>
             Starts after <code>{shortSha(base)}</code>{' '}
             {subject ? <span className={styles.baseSubject}>{subject}</span> : null}{' '}

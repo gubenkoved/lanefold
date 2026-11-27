@@ -164,6 +164,12 @@
         "icon": "$(arrow-up)"
       },
       {
+        "command": "lanefold.rebaseInteractive",
+        "title": "Rebase Interactively onto…",
+        "category": "Lanefold",
+        "icon": "$(list-ordered)"
+      },
+      {
         "command": "lanefold.stash",
         "title": "Stash Changes…",
         "category": "Lanefold",

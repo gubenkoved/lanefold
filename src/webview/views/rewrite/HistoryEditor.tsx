@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
+import { displayRev } from '../../../shared/oid';
 import { groupRewrite, type RewriteStep } from '../../../shared/rewrite';
 import { Icon } from '../../components/Icon';
 import { shortSha } from '../../graph/format';
@@ -21,6 +22,7 @@ import {
   foldCommits,
   holdApply,
   includeOlder,
+  isArranged,
   isDirty,
   moveFocus,
   moveSelection,
@@ -64,6 +66,14 @@ export function HistoryEditor({ session, model, color }: HistoryEditorProps) {
     return map;
   }, [session.simulation]);
   const dirty = useMemo(() => isDirty({ entries, range }), [entries, range]);
+  // A rebase can be applied as it opens: only an arrangement made since is asked about on Cancel.
+  const arranged = useMemo(
+    () => (range.onto ? isArranged({ entries, range }) : dirty),
+    [entries, range, dirty],
+  );
+  const branch = range.branch ?? 'HEAD';
+  const target = range.onto ? displayRev(range.onto.rev) : undefined;
+  const alreadyThere = useMemo(() => new Set(range.alreadyThere), [range.alreadyThere]);
   const [pane, setPane] = useState<'result' | 'git'>('result');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -114,7 +124,7 @@ export function HistoryEditor({ session, model, color }: HistoryEditorProps) {
 
   const cancel = () => {
     if (running) return;
-    if (dirty && !confirmCancel) {
+    if (arranged && !confirmCancel) {
       // Discarding wins over an Apply still waiting for its plan.
       holdApply();
       setConfirmCancel(true);
@@ -252,7 +262,8 @@ export function HistoryEditor({ session, model, color }: HistoryEditorProps) {
     <motion.section
       ref={sectionRef}
       className={styles.root}
-      aria-label={`Edit history of ${session.range.branch ?? 'HEAD'}`}
+      aria-label={target ? `Rebase ${branch} onto ${target}` : `Edit history of ${branch}`}
+      data-rebase={target ? '' : undefined}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 6 }}
@@ -266,16 +277,29 @@ export function HistoryEditor({ session, model, color }: HistoryEditorProps) {
       <header className={styles.header}>
         <Icon name="git-pull-request-draft" className={styles.titleIcon} />
         <h2 className={styles.title}>
-          <span className={styles.titleText}>Edit history of</span>{' '}
+          <span className={styles.titleText}>{target ? 'Rebase' : 'Edit history of'}</span>{' '}
           <span
             className={styles.branch}
             style={{ ['--c' as string]: color }}
             // Its name, whole, where a narrow header shortens it.
-            title={session.range.branch ?? 'HEAD'}
+            title={branch}
           >
             <Icon name="git-branch" />
-            <span className={styles.branchName}>{session.range.branch ?? 'HEAD'}</span>
+            <span className={styles.branchName}>{branch}</span>
           </span>
+          {target ? (
+            <>
+              {' '}
+              <span className={styles.titleText}>onto</span>{' '}
+              <span
+                className={[styles.branch, styles.target].join(' ')}
+                title={`${target} (${shortSha(range.onto!.sha)})`}
+              >
+                <Icon name="target" />
+                <span className={styles.branchName}>{target}</span>
+              </span>
+            </>
+          ) : null}
         </h2>
         <Summary session={session} conflict={conflictStep} problem={problem} dirty={dirty} onShow={show} />
         <span className={styles.spacer} />
@@ -329,7 +353,7 @@ export function HistoryEditor({ session, model, color }: HistoryEditorProps) {
           onClick={() => void applyRewrite()}
         >
           {session.applying ? <Icon name="loading" spin /> : <Icon name="check" />}
-          Apply
+          {target ? 'Rebase' : 'Apply'}
         </button>
       </header>
 
@@ -416,6 +440,7 @@ export function HistoryEditor({ session, model, color }: HistoryEditorProps) {
                     subject={reworded ? (entry.message!.split('\n', 1)[0] ?? '') : commit.subject}
                     reworded={reworded}
                     intoSubject={row.into ? subjects.get(row.into) : undefined}
+                    alreadyIn={alreadyThere.has(entry.sha) ? target : undefined}
                     dragged={!!drag?.shas.includes(entry.sha)}
                     dropTarget={drag?.target?.kind === 'fold' && drag.target.sha === entry.sha}
                     animate={rows.length <= ANIMATED_ROWS}

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { branchChoices, recentBranches, type BranchChoice } from '../core/repo/branchChoices';
+import { branchChoices, rebaseTargets, recentBranches, type BranchChoice } from '../core/repo/branchChoices';
 import type { Repository } from '../core/repo/repository';
 
 interface BranchItem extends vscode.QuickPickItem {
@@ -69,6 +69,41 @@ export async function pickBranchToSwitch(repo: Repository): Promise<string | 'cr
   if (!picked) return undefined;
   if (picked.action === 'create') return 'create';
   return picked.choice?.name;
+}
+
+/**
+ * Picks what to rebase the checked-out branch onto: branches used recently first, then the other
+ * local branches by latest commit, then the remote branches. Any other revision (a tag, a commit
+ * hash) can be typed. Resolves the revision, or undefined if dismissed.
+ */
+export async function pickRebaseTarget(repo: Repository): Promise<string | undefined> {
+  const [choices, recent, head] = await Promise.all([branchChoices(repo), recentBranches(repo), repo.head()]);
+  const targets = rebaseTargets(choices, recent);
+  const items: BranchItem[] = [];
+  const section = (label: string, list: readonly BranchChoice[]) => {
+    if (list.length === 0) return;
+    items.push({ label, kind: vscode.QuickPickItemKind.Separator }, ...list.map(item));
+  };
+  section('Recent', targets.recent);
+  section('Branches', targets.branches);
+  section('Remote branches', targets.remotes);
+  const quickPick = vscode.window.createQuickPick<BranchItem>();
+  quickPick.title = `Rebase ${head.branch ?? 'HEAD'} interactively onto… — ${repo.name}`;
+  quickPick.placeholder = 'A branch, or type any revision (a tag, a commit hash) and press Enter';
+  quickPick.matchOnDetail = true;
+  quickPick.items = items;
+  return new Promise<string | undefined>((resolve) => {
+    quickPick.onDidAccept(() => {
+      const selected = quickPick.selectedItems[0]?.choice?.name ?? quickPick.value.trim();
+      resolve(selected || undefined);
+      quickPick.hide();
+    });
+    quickPick.onDidHide(() => {
+      resolve(undefined);
+      quickPick.dispose();
+    });
+    quickPick.show();
+  });
 }
 
 /**

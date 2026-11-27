@@ -23,7 +23,7 @@ import { RepoDiscovery } from './repoDiscovery';
 import { RevisionFileSystem } from './revisionFs';
 import { VscodePlatform } from './vscodePlatform';
 import { EditorPanels } from './webviews/editorPanels';
-import { pickBranchToDelete, pickBranchToSwitch, pickComparison } from './quickPicks';
+import { pickBranchToDelete, pickBranchToSwitch, pickComparison, pickRebaseTarget } from './quickPicks';
 import { StatusBar } from './statusBar';
 import { PANEL_VIEW_ID, PanelViewProvider } from './webviews/panelView';
 
@@ -221,6 +221,13 @@ export class LanefoldApp implements vscode.Disposable {
       command('lanefold.push', async () => {
         const repo = await this.activeRepo();
         if (repo) await this.run(repo, { kind: 'push' });
+      }),
+      command('lanefold.rebaseInteractive', async () => {
+        const repo = await this.activeRepo();
+        if (!repo) return;
+        // The history editor opens on the commits the target lacks, to arrange before they move.
+        const onto = await pickRebaseTarget(repo);
+        if (onto) await this.runInView(repo, 'startRebaseOnto', { repoId: repo.id, onto });
       }),
       command('lanefold.stash', async () => {
         const repo = await this.activeRepo();

@@ -72,6 +72,15 @@ export function showInLog(repoId: string, sha: string, show?: RevealShow): void 
   requestReveal(repoId, sha, show);
 }
 
+/** Brings a log tab to the front (the history editor shows in one), opening one if there is none. */
+export function showLogTab(): void {
+  const { tabs, activateTab, addTab } = useApp.getState();
+  if (tabs.tabs.find((tab) => tab.id === tabs.activeTabId)?.kind === 'log') return;
+  const log = tabs.tabs.find((tab) => tab.kind === 'log');
+  if (log) activateTab(log.id);
+  else addTab({ kind: 'log', title: 'All', view: { scope: { type: 'all' } } });
+}
+
 /** Activates the Stashes tab, opening one if there is none; its list takes keyboard focus. */
 export function showStashes(): void {
   focusWhenShown('stashes');

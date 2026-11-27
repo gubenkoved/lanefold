@@ -113,7 +113,7 @@ function beyond(headline: string, message: string): string | undefined {
 }
 
 /** Resolves once `repoId` is the active repository (the host selects it first), or false. */
-function whenActive(repoId: string): Promise<boolean> {
+export function whenActive(repoId: string): Promise<boolean> {
   if (activeRepo() === repoId) return Promise.resolve(true);
   return new Promise((resolve) => {
     const timer = setTimeout(() => {

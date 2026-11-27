@@ -450,9 +450,10 @@ export class Backend implements Disposable {
       'op.undoInfo': ({ repoId }) => this.ops(repoId).undoInfo,
 
       'repo.opState': ({ repoId }) => this.ops(repoId).opState(),
-      'rewrite.range': ({ repoId, base }) => this.ops(repoId).rewriteRange(base),
-      'rewrite.simulate': ({ repoId, base, entries }, { signal }) =>
-        this.ops(repoId).simulate(base, entries, signal),
+      'rewrite.range': ({ repoId, base, onto }) =>
+        this.ops(repoId).rewriteRange(base, onto === undefined ? undefined : checkRev(onto)),
+      'rewrite.simulate': ({ repoId, base, onto, entries }, { signal }) =>
+        this.ops(repoId).simulate(base, entries, signal, onto === undefined ? undefined : checkRev(onto)),
       // Taking a side rewrites the file only: it stays conflicted (restorable with its markers)
       // until marked resolved.
       'conflict.take': async ({ repoId, path, side }) => {

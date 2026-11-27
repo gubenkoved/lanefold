@@ -111,6 +111,11 @@
   text-overflow: ellipsis;
 }
 
+/* What a rebase replays onto: named like the branch, without a colour of its own. */
+.target {
+  --c: var(--lf-fg-muted);
+}
+
 .summary {
   display: inline-flex;
   align-items: center;
@@ -804,6 +809,26 @@ button.predict:focus-visible {
   color: var(--lf-fg-muted);
   text-decoration: line-through;
   text-decoration-color: color-mix(in srgb, var(--lf-act-drop) 70%, transparent);
+}
+
+/* Rebasing: the target has this commit's changes already, as another commit. */
+.there {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 17px;
+  padding: 0 6px 0 4px;
+  border-radius: 9px;
+  border: 1px solid var(--lf-hairline);
+  background: var(--lf-bg-muted);
+  color: var(--lf-fg-muted);
+  font-size: var(--lf-text-xs);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.there :global(.codicon) {
+  font-size: 11px;
 }
 
 .pills {

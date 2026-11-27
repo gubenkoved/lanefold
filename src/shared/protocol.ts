@@ -252,12 +252,18 @@ export interface HostApi {
 
   /** The operation git is in the middle of (merge, rebase, …), with its conflicts. */
   'repo.opState'(params: { repoId: string }): OpState;
-  /** The commits a history edit after `base` covers (oldest first); undefined without commits. */
-  'rewrite.range'(params: { repoId: string; base: string | null }): RewriteRange | undefined;
+  /**
+   * The commits a history edit after `base` covers (oldest first); undefined without commits.
+   * With `onto`, the commits a rebase onto it replays: those after the merge base (`base` is
+   * not read), and the range says onto what — unless HEAD already contains `onto`, which leaves
+   * an ordinary edit of the commits after it.
+   */
+  'rewrite.range'(params: { repoId: string; base: string | null; onto?: string }): RewriteRange | undefined;
   /** Dry-runs a history edit with `git merge-tree`: which steps would conflict or become empty. */
   'rewrite.simulate'(params: {
     repoId: string;
     base: string | null;
+    onto?: string;
     entries: readonly RewriteEntry[];
   }): RewriteSimulation;
   /**
